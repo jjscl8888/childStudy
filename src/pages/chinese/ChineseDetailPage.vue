@@ -8,8 +8,7 @@ import { useLearningPathStore } from '@/stores/learningPathStore'
 import { useSpacedRepetitionStore } from '@/stores/spacedRepetitionStore'
 import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import SessionProgress from '@/components/learning/SessionProgress.vue'
-import WritingPad from '@/components/learning/WritingPad.vue'
-import StrokeDemo from '@/components/learning/StrokeDemo.vue'
+import HanziStrokeWriter from '@/components/learning/HanziStrokeWriter.vue'
 import CompanionGuide from '@/components/learning/CompanionGuide.vue'
 import RewardAnimation from '@/components/common/RewardAnimation.vue'
 
@@ -409,19 +408,10 @@ onUnmounted(() => {
           <div class="fun-card flex flex-col items-center gap-4 py-6 w-full">
             <h3 class="text-xl font-bold text-gray-600">书写练习 ✍️</h3>
 
-            <StrokeDemo
+            <HanziStrokeWriter
               :character="character.character"
-              type="chinese"
               color="#2ED573"
-              :size="180"
-            />
-
-            <WritingPad
-              :character="character.character"
-              type="chinese"
-              color="#2ED573"
-              :width="260"
-              :height="260"
+              :size="220"
               :required-count="3"
               @complete="onWritingComplete"
             />

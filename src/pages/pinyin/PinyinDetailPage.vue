@@ -9,8 +9,7 @@ import { useSpacedRepetitionStore } from '@/stores/spacedRepetitionStore'
 import { useSpeechRecognition } from '@/composables/useSpeechRecognition'
 import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import SessionProgress from '@/components/learning/SessionProgress.vue'
-import WritingPad from '@/components/learning/WritingPad.vue'
-import StrokeDemo from '@/components/learning/StrokeDemo.vue'
+import LetterByLetterWriter from '@/components/learning/LetterByLetterWriter.vue'
 import CompanionGuide from '@/components/learning/CompanionGuide.vue'
 import RewardAnimation from '@/components/common/RewardAnimation.vue'
 
@@ -487,20 +486,12 @@ onUnmounted(() => {
           <div class="fun-card flex flex-col items-center gap-4 py-6 w-full">
             <h3 class="text-xl font-bold text-gray-600">书写练习 ✍️</h3>
 
-            <StrokeDemo
-              :character="item.pinyin"
+            <LetterByLetterWriter
+              :text="item.pinyin"
               type="pinyin"
               color="#FF9F43"
-              :size="180"
-            />
-
-            <WritingPad
-              :character="item.pinyin"
-              type="pinyin"
-              color="#FF9F43"
-              :width="260"
-              :height="260"
-              :required-count="3"
+              :size="220"
+              :required-count="2"
               @complete="onWritingComplete"
             />
           </div>
