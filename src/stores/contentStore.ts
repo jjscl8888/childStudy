@@ -4,6 +4,7 @@ import type { PinyinItem } from '@/data/pinyinData'
 import type { ChineseCharacter } from '@/data/chineseData'
 import type { EnglishWord } from '@/data/englishData'
 import type { ExploreTopic } from '@/data/exploreData'
+import { query, run } from '@/db/database'
 
 export type ContentModule = 'pinyin' | 'chinese' | 'english' | 'explore'
 
@@ -14,7 +15,11 @@ export interface CustomContent {
   explore: ExploreTopic[]
 }
 
-const STORAGE_KEY = 'funlearn_custom_content'
+interface ContentRow {
+  id: string
+  module: string
+  data: string
+}
 
 export const useContentStore = defineStore('content', () => {
   const customContent = ref<CustomContent>({
@@ -25,45 +30,53 @@ export const useContentStore = defineStore('content', () => {
   })
 
   function loadFromStorage() {
-    const data = localStorage.getItem(STORAGE_KEY)
-    if (data) {
+    const rows = query<ContentRow>('SELECT id, module, data FROM custom_content')
+    const result: CustomContent = { pinyin: [], chinese: [], english: [], explore: [] }
+    for (const row of rows) {
       try {
-        customContent.value = JSON.parse(data)
+        const item = JSON.parse(row.data)
+        const module = row.module as ContentModule
+        if (module in result) {
+          result[module].push(item)
+        }
       } catch {
-        customContent.value = { pinyin: [], chinese: [], english: [], explore: [] }
+        // skip corrupted data
       }
     }
+    customContent.value = result
   }
 
-  function saveToStorage() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(customContent.value))
+  function saveItem(module: ContentModule, id: string, data: object) {
+    run('INSERT OR REPLACE INTO custom_content (id, module, data) VALUES (?, ?, ?)', [
+      id, module, JSON.stringify(data),
+    ])
   }
 
   function addPinyin(item: Omit<PinyinItem, 'id'>) {
     const newItem: PinyinItem = { ...item, id: `custom-py-${Date.now()}` }
     customContent.value.pinyin.push(newItem)
-    saveToStorage()
+    saveItem('pinyin', newItem.id, newItem)
     return newItem
   }
 
   function addChinese(item: Omit<ChineseCharacter, 'id'>) {
     const newItem: ChineseCharacter = { ...item, id: `custom-cn-${Date.now()}` }
     customContent.value.chinese.push(newItem)
-    saveToStorage()
+    saveItem('chinese', newItem.id, newItem)
     return newItem
   }
 
   function addEnglish(item: Omit<EnglishWord, 'id'>) {
     const newItem: EnglishWord = { ...item, id: `custom-en-${Date.now()}` }
     customContent.value.english.push(newItem)
-    saveToStorage()
+    saveItem('english', newItem.id, newItem)
     return newItem
   }
 
   function addExplore(item: Omit<ExploreTopic, 'id'>) {
     const newItem: ExploreTopic = { ...item, id: `custom-exp-${Date.now()}` }
     customContent.value.explore.push(newItem)
-    saveToStorage()
+    saveItem('explore', newItem.id, newItem)
     return newItem
   }
 
@@ -72,7 +85,7 @@ export const useContentStore = defineStore('content', () => {
     const index = list.findIndex(item => item.id === id)
     if (index !== -1) {
       list.splice(index, 1)
-      saveToStorage()
+      run('DELETE FROM custom_content WHERE id = ?', [id])
     }
   }
 
@@ -81,7 +94,7 @@ export const useContentStore = defineStore('content', () => {
     const item = list.find(i => i.id === id)
     if (item) {
       Object.assign(item, data)
-      saveToStorage()
+      saveItem(module, id, item)
     }
   }
 
@@ -105,6 +118,6 @@ export const useContentStore = defineStore('content', () => {
     updateItem,
     getCustomCount,
     getCustomList,
-    saveToStorage,
+    saveToStorage: loadFromStorage,
   }
 })

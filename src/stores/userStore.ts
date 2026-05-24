@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { query, queryOne, run, getDatabase, schedulePersist } from '@/db/database'
 
 export interface UserProfile {
   id: string
@@ -33,6 +34,85 @@ export interface Achievement {
   unlockedAt?: string
 }
 
+interface UserRow {
+  id: string
+  name: string
+  avatar: string
+  stars: number
+  level: number
+  streak: number
+  created_at: string
+}
+
+interface RecordRow {
+  id: string
+  module: string
+  topic: string
+  action: string
+  score: number | null
+  stars_earned: number
+  duration: number
+  created_at: string
+}
+
+interface AchievementRow {
+  id: string
+  code: string
+  name: string
+  description: string
+  icon: string
+  category: string
+  unlocked: number
+  unlocked_at: string | null
+}
+
+interface TodayMinutesRow {
+  date: string
+  minutes: number
+}
+
+interface CurrentUserRow {
+  user_id: string
+}
+
+function rowToUser(row: UserRow): UserProfile {
+  return {
+    id: row.id,
+    name: row.name,
+    avatar: row.avatar,
+    stars: row.stars,
+    level: row.level,
+    streak: row.streak,
+    createdAt: row.created_at,
+  }
+}
+
+function rowToRecord(row: RecordRow): LearningRecord {
+  return {
+    id: row.id,
+    module: row.module,
+    topic: row.topic,
+    action: row.action,
+    score: row.score,
+    starsEarned: row.stars_earned,
+    duration: row.duration,
+    createdAt: row.created_at,
+  }
+}
+
+function rowToAchievement(row: AchievementRow): Achievement {
+  return {
+    id: row.id,
+    code: row.code,
+    name: row.name,
+    description: row.description,
+    icon: row.icon,
+    category: row.category,
+    unlocked: row.unlocked === 1,
+    unlockedAt: row.unlocked_at ?? undefined,
+  }
+}
+
 export const useUserStore = defineStore('user', () => {
   const currentUser = ref<UserProfile | null>(null)
   const users = ref<UserProfile[]>([])
@@ -46,28 +126,25 @@ export const useUserStore = defineStore('user', () => {
   const currentStreak = computed(() => currentUser.value?.streak ?? 0)
 
   function loadFromStorage() {
-    const data = localStorage.getItem('funlearn_users')
-    if (data) {
-      users.value = JSON.parse(data)
+    const userRows = query<UserRow>('SELECT * FROM users')
+    users.value = userRows.map(rowToUser)
+
+    const currentRow = queryOne<CurrentUserRow>('SELECT user_id FROM current_user WHERE id = 1')
+    if (currentRow) {
+      currentUser.value = users.value.find(u => u.id === currentRow.user_id) ?? null
     }
-    const currentId = localStorage.getItem('funlearn_current_user')
-    if (currentId) {
-      currentUser.value = users.value.find(u => u.id === currentId) ?? null
-    }
-    const records = localStorage.getItem('funlearn_records')
-    if (records) {
-      learningRecords.value = JSON.parse(records)
-    }
-    const achs = localStorage.getItem('funlearn_achievements')
-    if (achs) {
-      achievements.value = JSON.parse(achs)
-    }
-    const mins = localStorage.getItem('funlearn_today_minutes')
-    if (mins) {
-      const parsed = JSON.parse(mins)
+
+    const recordRows = query<RecordRow>('SELECT * FROM learning_records ORDER BY created_at')
+    learningRecords.value = recordRows.map(rowToRecord)
+
+    const achRows = query<AchievementRow>('SELECT * FROM achievements')
+    achievements.value = achRows.map(rowToAchievement)
+
+    const minsRow = queryOne<TodayMinutesRow>('SELECT date, minutes FROM today_minutes WHERE id = 1')
+    if (minsRow) {
       const today = new Date().toDateString()
-      if (parsed.date === today) {
-        todayMinutes.value = parsed.minutes
+      if (minsRow.date === today) {
+        todayMinutes.value = minsRow.minutes
       } else {
         todayMinutes.value = 0
       }
@@ -75,16 +152,17 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function saveToStorage() {
-    localStorage.setItem('funlearn_users', JSON.stringify(users.value))
     if (currentUser.value) {
-      localStorage.setItem('funlearn_current_user', currentUser.value.id)
+      run('UPDATE users SET name=?, avatar=?, stars=?, level=?, streak=? WHERE id=?', [
+        currentUser.value.name, currentUser.value.avatar,
+        currentUser.value.stars, currentUser.value.level,
+        currentUser.value.streak, currentUser.value.id,
+      ])
+      run('INSERT OR REPLACE INTO current_user (id, user_id) VALUES (1, ?)', [currentUser.value.id])
     }
-    localStorage.setItem('funlearn_records', JSON.stringify(learningRecords.value))
-    localStorage.setItem('funlearn_achievements', JSON.stringify(achievements.value))
-    localStorage.setItem('funlearn_today_minutes', JSON.stringify({
-      date: new Date().toDateString(),
-      minutes: todayMinutes.value,
-    }))
+
+    const today = new Date().toDateString()
+    run('INSERT OR REPLACE INTO today_minutes (id, date, minutes) VALUES (1, ?, ?)', [today, todayMinutes.value])
   }
 
   function createUser(name: string, avatar: string) {
@@ -97,24 +175,28 @@ export const useUserStore = defineStore('user', () => {
       streak: 0,
       createdAt: new Date().toISOString(),
     }
+    run(
+      'INSERT INTO users (id, name, avatar, stars, level, streak, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [user.id, user.name, user.avatar, user.stars, user.level, user.streak, user.createdAt]
+    )
     users.value.push(user)
     currentUser.value = user
+    run('INSERT OR REPLACE INTO current_user (id, user_id) VALUES (1, ?)', [user.id])
     initAchievements(user.id)
-    saveToStorage()
     return user
   }
 
   function switchUser(userId: string) {
     currentUser.value = users.value.find(u => u.id === userId) ?? null
     if (currentUser.value) {
-      localStorage.setItem('funlearn_current_user', currentUser.value.id)
+      run('INSERT OR REPLACE INTO current_user (id, user_id) VALUES (1, ?)', [currentUser.value.id])
     }
   }
 
   function selectUser(userId: string) {
     currentUser.value = users.value.find(u => u.id === userId) ?? null
     if (currentUser.value) {
-      localStorage.setItem('funlearn_current_user', currentUser.value.id)
+      run('INSERT OR REPLACE INTO current_user (id, user_id) VALUES (1, ?)', [currentUser.value.id])
     }
   }
 
@@ -134,12 +216,15 @@ export const useUserStore = defineStore('user', () => {
       id: Date.now().toString(),
       createdAt: new Date().toISOString(),
     }
+    run(
+      'INSERT INTO learning_records (id, module, topic, action, score, stars_earned, duration, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [newRecord.id, newRecord.module, newRecord.topic, newRecord.action, newRecord.score, newRecord.starsEarned, newRecord.duration, newRecord.createdAt]
+    )
     learningRecords.value.push(newRecord)
     if (record.starsEarned > 0) {
       addStars(record.starsEarned)
     }
     checkAchievements()
-    saveToStorage()
   }
 
   function startSession() {
@@ -166,7 +251,16 @@ export const useUserStore = defineStore('user', () => {
       { id: '8', code: 'perfect_quiz', name: '满分达人', description: '一次测验全部答对', icon: '🏆', category: 'general', unlocked: false },
     ]
     achievements.value = defaultAchievements
-    saveToStorage()
+
+    run('DELETE FROM achievements')
+    const stmt = getDatabase().prepare(
+      'INSERT INTO achievements (id, code, name, description, icon, category, unlocked, unlocked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    )
+    for (const ach of defaultAchievements) {
+      stmt.run([ach.id, ach.code, ach.name, ach.description, ach.icon, ach.category, 0, null])
+    }
+    stmt.free()
+    schedulePersist()
   }
 
   function checkAchievements() {
@@ -175,7 +269,7 @@ export const useUserStore = defineStore('user', () => {
     const chineseCount = learningRecords.value.filter(r => r.module === 'chinese' && r.action === 'learn').length
     const englishCount = learningRecords.value.filter(r => r.module === 'english' && r.action === 'learn').length
     const mathCount = learningRecords.value.filter(r => r.module === 'math').length
-    const totalStars = currentUser.value.stars
+    const totalStarsVal = currentUser.value.stars
 
     const updates: Record<string, boolean> = {
       first_learn: learningRecords.value.length >= 1,
@@ -183,16 +277,16 @@ export const useUserStore = defineStore('user', () => {
       chinese_star: chineseCount >= 10,
       english_hero: englishCount >= 10,
       math_genius: mathCount >= 10,
-      star_100: totalStars >= 100,
+      star_100: totalStarsVal >= 100,
     }
 
     for (const ach of achievements.value) {
       if (updates[ach.code] !== undefined && updates[ach.code] && !ach.unlocked) {
         ach.unlocked = true
         ach.unlockedAt = new Date().toISOString()
+        run('UPDATE achievements SET unlocked = 1, unlocked_at = ? WHERE id = ?', [ach.unlockedAt, ach.id])
       }
     }
-    saveToStorage()
   }
 
   function unlockAchievement(code: string) {
@@ -200,8 +294,8 @@ export const useUserStore = defineStore('user', () => {
     if (ach && !ach.unlocked) {
       ach.unlocked = true
       ach.unlockedAt = new Date().toISOString()
+      run('UPDATE achievements SET unlocked = 1, unlocked_at = ? WHERE id = ?', [ach.unlockedAt, ach.id])
       addStars(5)
-      saveToStorage()
     }
   }
 
@@ -212,7 +306,7 @@ export const useUserStore = defineStore('user', () => {
 
   function logout() {
     currentUser.value = null
-    localStorage.removeItem('funlearn_current_user')
+    run('DELETE FROM current_user WHERE id = 1')
   }
 
   loadFromStorage()

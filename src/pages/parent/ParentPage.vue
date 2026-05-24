@@ -2,20 +2,25 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useAdminStore } from '@/stores/adminStore'
+import { queryOne, run } from '@/db/database'
 import TopBar from '@/components/layout/TopBar.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
-
-const DEFAULT_PASSWORD = '123456'
-const passwordInput = ref('')
-const isUnlocked = ref(false)
-const passwordError = ref('')
+const adminStore = useAdminStore()
 
 interface ParentSettings {
   dailyTimeLimit: number
   sessionTimeLimit: number
   enabledModules: Record<string, boolean>
+}
+
+interface ParentSettingsRow {
+  daily_time_limit: number
+  session_time_limit: number
+  enabled_modules: string
+  password: string
 }
 
 const settings = reactive<ParentSettings>({
@@ -31,42 +36,72 @@ const settings = reactive<ParentSettings>({
 })
 
 const settingsSaved = ref(false)
+const showPasswordModal = ref(false)
+const oldPassword = ref('')
+const newPassword = ref('')
+const confirmPassword = ref('')
+const passwordMsg = ref('')
+const passwordMsgType = ref<'success' | 'error'>('error')
 
 onMounted(() => {
-  const saved = localStorage.getItem('funlearn_parent_settings')
-  if (saved) {
-    const parsed = JSON.parse(saved)
-    Object.assign(settings, parsed)
-  }
-  const unlocked = localStorage.getItem('funlearn_parent_unlocked')
-  if (unlocked === 'true') {
-    isUnlocked.value = true
+  const row = queryOne<ParentSettingsRow>('SELECT * FROM parent_settings WHERE id = 1')
+  if (row) {
+    settings.dailyTimeLimit = row.daily_time_limit
+    settings.sessionTimeLimit = row.session_time_limit
+    try {
+      Object.assign(settings.enabledModules, JSON.parse(row.enabled_modules))
+    } catch { /* use defaults */ }
   }
 })
 
-function handleSubmitPassword() {
-  const storedPassword = localStorage.getItem('funlearn_parent_password') || DEFAULT_PASSWORD
-  if (passwordInput.value === storedPassword) {
-    isUnlocked.value = true
-    localStorage.setItem('funlearn_parent_unlocked', 'true')
-    passwordError.value = ''
-  } else {
-    passwordError.value = '密码错误，请重试'
-    passwordInput.value = ''
-  }
-}
-
-function handleLock() {
-  isUnlocked.value = false
-  localStorage.removeItem('funlearn_parent_unlocked')
-}
-
 function saveSettings() {
-  localStorage.setItem('funlearn_parent_settings', JSON.stringify(settings))
+  run(
+    'INSERT OR REPLACE INTO parent_settings (id, daily_time_limit, session_time_limit, enabled_modules, password) VALUES (1, ?, ?, ?, ?)',
+    [settings.dailyTimeLimit, settings.sessionTimeLimit, JSON.stringify(settings.enabledModules), queryOne<ParentSettingsRow>('SELECT password FROM parent_settings WHERE id = 1')?.password ?? '123456']
+  )
   settingsSaved.value = true
   setTimeout(() => {
     settingsSaved.value = false
   }, 2000)
+}
+
+function handleLogout() {
+  adminStore.logout()
+  router.replace('/admin/login')
+}
+
+function handleChangePassword() {
+  passwordMsg.value = ''
+  if (!oldPassword.value || !newPassword.value || !confirmPassword.value) {
+    passwordMsg.value = '请填写所有字段'
+    passwordMsgType.value = 'error'
+    return
+  }
+  if (newPassword.value.length < 6) {
+    passwordMsg.value = '新密码至少6个字符'
+    passwordMsgType.value = 'error'
+    return
+  }
+  if (newPassword.value !== confirmPassword.value) {
+    passwordMsg.value = '两次输入的新密码不一致'
+    passwordMsgType.value = 'error'
+    return
+  }
+  const result = adminStore.changePassword(oldPassword.value, newPassword.value)
+  if (result.success) {
+    passwordMsg.value = '密码修改成功'
+    passwordMsgType.value = 'success'
+    oldPassword.value = ''
+    newPassword.value = ''
+    confirmPassword.value = ''
+    setTimeout(() => {
+      showPasswordModal.value = false
+      passwordMsg.value = ''
+    }, 1500)
+  } else {
+    passwordMsg.value = result.error ?? '修改失败'
+    passwordMsgType.value = 'error'
+  }
 }
 
 const todayRecords = computed(() => {
@@ -138,36 +173,29 @@ function goBack() {
 
 <template>
   <div class="min-h-screen bg-warm pb-6">
-    <TopBar title="家长中心 🔒" />
+    <TopBar title="管理后台 🔒" />
 
-    <div v-if="!isUnlocked" class="px-4 pt-8">
-      <div class="fun-card max-w-sm mx-auto text-center">
-        <div class="text-5xl mb-4">🔐</div>
-        <h2 class="text-xl font-bold text-gray-700 mb-2">请输入家长密码</h2>
-        <p class="text-sm text-gray-400 mb-6">仅限家长访问此页面</p>
+    <div class="px-4 pt-4 space-y-4">
+      <section class="fun-card">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-lg font-bold text-gray-700 flex items-center gap-2">
+            <span>👤</span> 管理员信息
+          </h3>
+          <span class="text-xs px-3 py-1 rounded-full bg-green-100 text-green-700 font-bold">
+            已登录
+          </span>
+        </div>
+        <div class="flex items-center gap-3 p-3 rounded-xl2 bg-gray-50">
+          <div class="flex h-12 w-12 items-center justify-center rounded-xl2 text-3xl bg-primary/10 shrink-0">
+            👨‍💼
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="font-bold text-gray-700">{{ adminStore.currentAdmin?.username ?? 'admin' }}</div>
+            <div class="text-xs text-gray-400">管理员账号</div>
+          </div>
+        </div>
+      </section>
 
-        <form @submit.prevent="handleSubmitPassword">
-          <input
-            v-model="passwordInput"
-            type="password"
-            placeholder="输入密码..."
-            class="fun-input text-center mb-3"
-            maxlength="20"
-          />
-          <p v-if="passwordError" class="text-sm text-accent font-bold mb-3">{{ passwordError }}</p>
-          <button
-            type="submit"
-            class="fun-btn-primary w-full"
-            :disabled="!passwordInput"
-            :class="{ 'opacity-50 cursor-not-allowed': !passwordInput }"
-          >
-            进入
-          </button>
-        </form>
-      </div>
-    </div>
-
-    <div v-else class="px-4 pt-4 space-y-4">
       <section class="fun-card">
         <h3 class="text-lg font-bold text-gray-700 mb-3 flex items-center gap-2">
           <span>👶</span> 孩子档案
@@ -367,21 +395,93 @@ function goBack() {
         </Transition>
       </section>
 
-      <div class="flex gap-3 pt-2">
+      <div class="space-y-3 pt-2">
         <button
-          class="fun-btn-secondary flex-1 text-base"
-          @click="goBack"
+          class="fun-btn-secondary w-full text-base"
+          @click="showPasswordModal = true"
         >
-          ← 返回
+          🔑 修改密码
         </button>
-        <button
-          class="fun-btn-accent flex-1 text-base"
-          @click="handleLock"
-        >
-          🔒 锁定
-        </button>
+
+        <div class="flex gap-3">
+          <button
+            class="fun-btn-secondary flex-1 text-base"
+            @click="goBack"
+          >
+            ← 返回
+          </button>
+          <button
+            class="fun-btn-accent flex-1 text-base"
+            @click="handleLogout"
+          >
+            🚪 退出登录
+          </button>
+        </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div
+        v-if="showPasswordModal"
+        class="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 px-4"
+        @click.self="showPasswordModal = false"
+      >
+        <div class="fun-card w-full max-w-sm animate-pop">
+          <h3 class="text-lg font-bold text-gray-700 mb-4 text-center">修改管理员密码</h3>
+          <form @submit.prevent="handleChangePassword" class="space-y-3">
+            <div>
+              <label class="block text-sm font-bold text-gray-500 mb-1">原密码</label>
+              <input
+                v-model="oldPassword"
+                type="password"
+                class="fun-input"
+                placeholder="请输入原密码"
+                autocomplete="current-password"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-500 mb-1">新密码</label>
+              <input
+                v-model="newPassword"
+                type="password"
+                class="fun-input"
+                placeholder="至少6个字符"
+                autocomplete="new-password"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-bold text-gray-500 mb-1">确认新密码</label>
+              <input
+                v-model="confirmPassword"
+                type="password"
+                class="fun-input"
+                placeholder="再次输入新密码"
+                autocomplete="new-password"
+              />
+            </div>
+            <p
+              v-if="passwordMsg"
+              class="text-sm font-bold text-center"
+              :class="passwordMsgType === 'success' ? 'text-success' : 'text-accent'"
+            >
+              {{ passwordMsg }}
+            </p>
+            <div class="flex gap-3 pt-2">
+              <button
+                type="button"
+                class="fun-btn-secondary flex-1"
+                @click="showPasswordModal = false; passwordMsg = ''"
+              >
+                取消
+              </button>
+              <button type="submit" class="fun-btn-primary flex-1">
+                确认修改
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -399,5 +499,12 @@ function goBack() {
 @keyframes fadeOut {
   from { opacity: 1; transform: translateY(0); }
   to { opacity: 0; transform: translateY(-5px); }
+}
+.animate-pop {
+  animation: pop 0.3s ease-out;
+}
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
 }
 </style>

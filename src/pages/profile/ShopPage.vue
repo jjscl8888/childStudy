@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { query, run } from '@/db/database'
 import TopBar from '@/components/layout/TopBar.vue'
 
 const router = useRouter()
@@ -30,15 +31,14 @@ const shopItems: ShopItem[] = [
 const purchasedIds = ref<string[]>([])
 const purchaseMessage = ref('')
 
-const storageKey = computed(() => {
-  return `funlearn_purchased_${userStore.currentUser?.id ?? 'guest'}`
-})
+interface PurchaseRow {
+  item_id: string
+}
 
 onMounted(() => {
-  const data = localStorage.getItem(storageKey.value)
-  if (data) {
-    purchasedIds.value = JSON.parse(data)
-  }
+  const userId = userStore.currentUser?.id ?? 'guest'
+  const rows = query<PurchaseRow>('SELECT item_id FROM shop_purchases WHERE user_id = ?', [userId])
+  purchasedIds.value = rows.map(r => r.item_id)
 })
 
 function isPurchased(itemId: string): boolean {
@@ -52,9 +52,10 @@ function canAfford(price: number): boolean {
 function handlePurchase(item: ShopItem) {
   if (isPurchased(item.id) || !canAfford(item.price)) return
 
+  const userId = userStore.currentUser?.id ?? 'guest'
   userStore.addStars(-item.price)
   purchasedIds.value.push(item.id)
-  localStorage.setItem(storageKey.value, JSON.stringify(purchasedIds.value))
+  run('INSERT OR IGNORE INTO shop_purchases (user_id, item_id) VALUES (?, ?)', [userId, item.id])
 
   purchaseMessage.value = `🎉 成功购买 ${item.name}！`
   setTimeout(() => {

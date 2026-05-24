@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { query, run } from '@/db/database'
 
 export interface ReviewItem {
   id: string
@@ -13,7 +14,31 @@ export interface ReviewItem {
   createdAt: number
 }
 
-const STORAGE_KEY = 'funlearn_review_items'
+interface ReviewRow {
+  id: string
+  module_id: string
+  item_id: string
+  level: number
+  next_review: number
+  last_review: number | null
+  review_count: number
+  ease_factor: number
+  created_at: number
+}
+
+function rowToReviewItem(row: ReviewRow): ReviewItem {
+  return {
+    id: row.id,
+    moduleId: row.module_id,
+    itemId: row.item_id,
+    level: row.level,
+    nextReview: row.next_review,
+    lastReview: row.last_review,
+    reviewCount: row.review_count,
+    easeFactor: row.ease_factor,
+    createdAt: row.created_at,
+  }
+}
 
 const INTERVALS = [1, 2, 4, 7, 15, 30]
 
@@ -36,18 +61,8 @@ export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
   const reviewCount = computed(() => overdueReviews.value.length)
 
   function loadFromStorage() {
-    const data = localStorage.getItem(STORAGE_KEY)
-    if (data) {
-      try {
-        reviewItems.value = JSON.parse(data)
-      } catch {
-        reviewItems.value = []
-      }
-    }
-  }
-
-  function saveToStorage() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(reviewItems.value))
+    const rows = query<ReviewRow>('SELECT * FROM review_items')
+    reviewItems.value = rows.map(rowToReviewItem)
   }
 
   function addReviewItem(moduleId: string, itemId: string) {
@@ -60,7 +75,7 @@ export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
     const nextReview = new Date(now)
     nextReview.setDate(nextReview.getDate() + INTERVALS[0])
 
-    reviewItems.value.push({
+    const item: ReviewItem = {
       id: `${moduleId}-${itemId}`,
       moduleId,
       itemId,
@@ -70,8 +85,13 @@ export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
       reviewCount: 0,
       easeFactor: 2.5,
       createdAt: now,
-    })
-    saveToStorage()
+    }
+
+    reviewItems.value.push(item)
+    run(
+      'INSERT INTO review_items (id, module_id, item_id, level, next_review, last_review, review_count, ease_factor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [item.id, item.moduleId, item.itemId, item.level, item.nextReview, item.lastReview, item.reviewCount, item.easeFactor, item.createdAt]
+    )
   }
 
   function processReview(moduleId: string, itemId: string, quality: 'easy' | 'good' | 'hard') {
@@ -100,7 +120,10 @@ export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
     nextReview.setDate(nextReview.getDate() + Math.max(adjustedDays, 1))
     item.nextReview = nextReview.getTime()
 
-    saveToStorage()
+    run(
+      'UPDATE review_items SET level=?, next_review=?, last_review=?, review_count=?, ease_factor=? WHERE id=?',
+      [item.level, item.nextReview, item.lastReview, item.reviewCount, item.easeFactor, item.id]
+    )
   }
 
   function getReviewItem(moduleId: string, itemId: string): ReviewItem | undefined {
@@ -122,8 +145,9 @@ export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
       r => r.moduleId === moduleId && r.itemId === itemId
     )
     if (index !== -1) {
+      const id = reviewItems.value[index].id
       reviewItems.value.splice(index, 1)
-      saveToStorage()
+      run('DELETE FROM review_items WHERE id = ?', [id])
     }
   }
 
@@ -140,6 +164,6 @@ export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
     isDueForReview,
     getModuleReviews,
     removeReviewItem,
-    saveToStorage,
+    saveToStorage: loadFromStorage,
   }
 })

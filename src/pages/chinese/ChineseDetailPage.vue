@@ -124,6 +124,45 @@ function selectWordOption(option: string) {
   }
 }
 
+const praiseMessages = [
+  '太棒了！你真厉害！',
+  '完美！继续加油哦！',
+  '你真是学习小天才！',
+  '做得太好了！为你骄傲！',
+  '了不起！继续保持！',
+]
+
+function getRandomPraise(): string {
+  return praiseMessages[Math.floor(Math.random() * praiseMessages.length)]
+}
+
+function speakIntro(text: string) {
+  setTimeout(() => {
+    tts.speak(text, { lang: 'zh-CN', rate: 0.7 })
+  }, 600)
+}
+
+function speakStepIntro(step: number) {
+  if (!character.value) return
+  switch (step) {
+    case 0:
+      speakIntro(`来认识汉字${character.value.character}。它的拼音是${character.value.pinyin}。点击听一听发音按钮。`)
+      break
+    case 1:
+      speakIntro(`每个汉字都有自己的故事。来听听${character.value.character}字是怎么来的。`)
+      break
+    case 2:
+      speakIntro(`现在来写一写${character.value.character}字。在格子里认真写三次哦。`)
+      break
+    case 3:
+      speakIntro(`来学学${character.value.character}字怎么组词造句吧。`)
+      break
+    case 4:
+      speakIntro(`最后一关！看看你是不是真的学会了${character.value.character}字。`)
+      break
+  }
+}
+
 function nextStep() {
   if (currentStep.value < TOTAL_STEPS - 1) {
     currentStep.value++
@@ -141,6 +180,8 @@ function nextStep() {
     } else if (currentStep.value === 4) {
       setCompanion('最后一关！看看你是不是真的学会了！🏆', 'encourage')
     }
+
+    speakStepIntro(currentStep.value)
   } else {
     finishSession()
   }
@@ -171,6 +212,16 @@ function finishSession() {
   })
 
   setCompanion('太棒了！你又学会了一个新字！🌟', 'celebrate')
+
+  setTimeout(() => {
+    if (avgScore >= 80) {
+      tts.speak(`完美！汉字${character.value?.character}你已经完全掌握了！${getRandomPraise()}`, { lang: 'zh-CN', rate: 0.8 })
+    } else if (avgScore >= 50) {
+      tts.speak(`不错哦！汉字${character.value?.character}学习完成！继续努力！`, { lang: 'zh-CN', rate: 0.8 })
+    } else {
+      tts.speak(`汉字${character.value?.character}学习完成！多练习几次会更好的，加油！`, { lang: 'zh-CN', rate: 0.8 })
+    }
+  }, 800)
 }
 
 function goBack() {
@@ -221,6 +272,7 @@ watch(id, (newId) => {
   resetSession()
   learningPathStore.startSession('chinese', newId, TOTAL_STEPS)
   setCompanion(`来认识汉字"${newItem.character}"吧！先看看它的样子~`, 'happy')
+  speakStepIntro(0)
 })
 
 onMounted(() => {
@@ -230,6 +282,7 @@ onMounted(() => {
   }
   learningPathStore.startSession('chinese', id.value, TOTAL_STEPS)
   setCompanion(`来认识汉字"${character.value.character}"吧！先看看它的样子~`, 'happy')
+  speakStepIntro(0)
 })
 
 onUnmounted(() => {

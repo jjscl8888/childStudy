@@ -185,6 +185,8 @@ function nextStep() {
     } else if (currentStep.value === 4) {
       setCompanion('最后一关！复习挑战等你来！🏆', 'encourage')
     }
+
+    speakStepIntro(currentStep.value)
   } else {
     finishSession()
   }
@@ -215,6 +217,16 @@ function finishSession() {
   })
 
   setCompanion('太棒了！你完成了所有学习步骤！🌟', 'celebrate')
+
+  setTimeout(() => {
+    if (avgScore >= 80) {
+      tts.speak(`完美！拼音${item.value?.pinyin}你已经完全掌握了！${getRandomPraise()}`, { lang: 'zh-CN', rate: 0.8 })
+    } else if (avgScore >= 50) {
+      tts.speak(`不错哦！拼音${item.value?.pinyin}学习完成！继续努力！`, { lang: 'zh-CN', rate: 0.8 })
+    } else {
+      tts.speak(`拼音${item.value?.pinyin}学习完成！多练习几次会更好的，加油！`, { lang: 'zh-CN', rate: 0.8 })
+    }
+  }, 800)
 }
 
 function goBack() {
@@ -263,6 +275,45 @@ function resetSession() {
   stepResults.value = []
 }
 
+const praiseMessages = [
+  '太棒了！你真厉害！',
+  '完美！继续加油哦！',
+  '你真是学习小天才！',
+  '做得太好了！为你骄傲！',
+  '了不起！继续保持！',
+]
+
+function getRandomPraise(): string {
+  return praiseMessages[Math.floor(Math.random() * praiseMessages.length)]
+}
+
+function speakIntro(text: string) {
+  setTimeout(() => {
+    tts.speak(text, { lang: 'zh-CN', rate: 0.7 })
+  }, 600)
+}
+
+function speakStepIntro(step: number) {
+  if (!item.value) return
+  switch (step) {
+    case 0:
+      speakIntro(`来认识拼音${item.value.pinyin}。点击听发音按钮，听一听它的声音。`)
+      break
+    case 1:
+      speakIntro(`现在来跟读练习。点击大麦克风，大声读出${item.value.pinyin}。`)
+      break
+    case 2:
+      speakIntro(`动手写一写${item.value.pinyin}，记得更牢哦。在格子里写三次。`)
+      break
+    case 3:
+      speakIntro(`来玩个小游戏。找出哪个是${item.value.pinyin}。`)
+      break
+    case 4:
+      speakIntro(`最后一关复习挑战！${item.value.pinyin}对应哪个词呢？`)
+      break
+  }
+}
+
 watch(id, (newId) => {
   if (!newId) return
   const newItem = pinyinData.find(p => p.id === newId)
@@ -270,6 +321,7 @@ watch(id, (newId) => {
   resetSession()
   learningPathStore.startSession('pinyin', newId, TOTAL_STEPS)
   setCompanion(`来认识拼音 "${newItem.pinyin}" 吧！先听一听它的声音~`, 'happy')
+  speakStepIntro(0)
 })
 
 onMounted(() => {
@@ -279,6 +331,7 @@ onMounted(() => {
   }
   learningPathStore.startSession('pinyin', id.value, TOTAL_STEPS)
   setCompanion(`来认识拼音 "${item.value.pinyin}" 吧！先听一听它的声音~`, 'happy')
+  speakStepIntro(0)
 })
 
 onUnmounted(() => {

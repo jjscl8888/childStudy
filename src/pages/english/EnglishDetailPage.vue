@@ -166,6 +166,45 @@ function selectMeaningOption(option: string) {
   }
 }
 
+const praiseMessages = [
+  '太棒了！你真厉害！',
+  'Perfect! 继续加油哦！',
+  '你真是英语小天才！',
+  '做得太好了！为你骄傲！',
+  'Amazing! 继续保持！',
+]
+
+function getRandomPraise(): string {
+  return praiseMessages[Math.floor(Math.random() * praiseMessages.length)]
+}
+
+function speakIntro(text: string, lang: string = 'zh-CN') {
+  setTimeout(() => {
+    tts.speak(text, { lang, rate: 0.7 })
+  }, 600)
+}
+
+function speakStepIntro(step: number) {
+  if (!word.value) return
+  switch (step) {
+    case 0:
+      speakIntro(`来认识英语单词${word.value.chinese}。它的英文是${word.value.word}。点击听发音按钮。`, 'zh-CN')
+      break
+    case 1:
+      speakIntro(`现在来跟读练习。点击大麦克风，大声读出${word.value.word}。`, 'zh-CN')
+      break
+    case 2:
+      speakIntro(`动手拼一拼${word.value.word}，在格子里写三次哦。`, 'zh-CN')
+      break
+    case 3:
+      speakIntro(`来玩个小游戏。找出${word.value.chinese}的英文是哪个。`, 'zh-CN')
+      break
+    case 4:
+      speakIntro(`最后一关！看看你是不是真的掌握了${word.value.word}。`, 'zh-CN')
+      break
+  }
+}
+
 function nextStep() {
   if (currentStep.value < TOTAL_STEPS - 1) {
     currentStep.value++
@@ -183,6 +222,8 @@ function nextStep() {
     } else if (currentStep.value === 4) {
       setCompanion('最后一关！看看你是不是真的学会了！🏆', 'encourage')
     }
+
+    speakStepIntro(currentStep.value)
   } else {
     finishSession()
   }
@@ -213,6 +254,16 @@ function finishSession() {
   })
 
   setCompanion('太棒了！你又学会了一个新单词！🌟', 'celebrate')
+
+  setTimeout(() => {
+    if (avgScore >= 80) {
+      tts.speak(`Perfect! 单词${word.value?.word}你已经完全掌握了！${getRandomPraise()}`, { lang: 'zh-CN', rate: 0.8 })
+    } else if (avgScore >= 50) {
+      tts.speak(`不错哦！单词${word.value?.word}学习完成！继续努力！`, { lang: 'zh-CN', rate: 0.8 })
+    } else {
+      tts.speak(`单词${word.value?.word}学习完成！多练习几次会更好的，加油！`, { lang: 'zh-CN', rate: 0.8 })
+    }
+  }, 800)
 }
 
 function resetSession() {
@@ -266,6 +317,7 @@ watch(id, (newId) => {
   resetSession()
   learningPathStore.startSession('english', newId, TOTAL_STEPS)
   setCompanion(`来认识单词 "${newItem.word}" 吧！先听一听~`, 'happy')
+  speakStepIntro(0)
 })
 
 onMounted(() => {
@@ -276,6 +328,7 @@ onMounted(() => {
   learningPathStore.initModulePath('english', englishData)
   learningPathStore.startSession('english', id.value, TOTAL_STEPS)
   setCompanion(`来认识单词 "${word.value.word}" 吧！先听一听~`, 'happy')
+  speakStepIntro(0)
 })
 
 onUnmounted(() => {

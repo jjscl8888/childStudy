@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useUserStore } from './userStore'
+import { query, run, getDatabase, schedulePersist } from '@/db/database'
 
 export interface PathNode {
   id: string
@@ -41,7 +42,27 @@ export interface StepResult {
   timestamp: number
 }
 
-const STORAGE_KEY = 'funlearn_learning_path'
+interface PathNodeRow {
+  id: string
+  module_id: string
+  item_id: string
+  order_num: number
+  status: string
+  stars: number
+  completed_at: string | null
+}
+
+function rowToPathNode(row: PathNodeRow): PathNode {
+  return {
+    id: row.id,
+    moduleId: row.module_id,
+    itemId: row.item_id,
+    order: row.order_num,
+    status: row.status as PathNode['status'],
+    stars: row.stars,
+    completedAt: row.completed_at ?? undefined,
+  }
+}
 
 export const useLearningPathStore = defineStore('learningPath', () => {
   const userStore = useUserStore()
@@ -56,26 +77,18 @@ export const useLearningPathStore = defineStore('learningPath', () => {
   const overallProgress = computed(() => totalNodes.value > 0 ? completedCount.value / totalNodes.value : 0)
 
   function loadFromStorage() {
-    const data = localStorage.getItem(STORAGE_KEY)
-    if (data) {
-      try {
-        const parsed = JSON.parse(data)
-        pathNodes.value = parsed.pathNodes || []
-      } catch {
-        pathNodes.value = []
-      }
-    }
-  }
-
-  function saveToStorage() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      pathNodes: pathNodes.value,
-    }))
+    const rows = query<PathNodeRow>('SELECT * FROM path_nodes ORDER BY order_num')
+    pathNodes.value = rows.map(rowToPathNode)
   }
 
   function initModulePath(moduleId: string, items: { id: string }[], groupInfo?: { name: string; icon: string; color: string }) {
     const existing = pathNodes.value.filter(n => n.moduleId === moduleId)
     if (existing.length > 0) return
+
+    const db = getDatabase()
+    const stmt = db.prepare(
+      'INSERT INTO path_nodes (id, module_id, item_id, order_num, status, stars, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    )
 
     const nodes: PathNode[] = items.map((item, index) => ({
       id: `${moduleId}-${item.id}`,
@@ -86,8 +99,13 @@ export const useLearningPathStore = defineStore('learningPath', () => {
       stars: 0,
     }))
 
+    for (const node of nodes) {
+      stmt.run([node.id, node.moduleId, node.itemId, node.order, node.status, node.stars, null])
+    }
+    stmt.free()
+    schedulePersist()
+
     pathNodes.value.push(...nodes)
-    saveToStorage()
   }
 
   function getNode(moduleId: string, itemId: string): PathNode | undefined {
@@ -119,14 +137,17 @@ export const useLearningPathStore = defineStore('learningPath', () => {
     node.stars = Math.max(node.stars, stars)
     node.completedAt = new Date().toISOString()
 
+    run('UPDATE path_nodes SET status=?, stars=?, completed_at=? WHERE id=?', [
+      node.status, node.stars, node.completedAt, node.id,
+    ])
+
     const nextNode = pathNodes.value.find(
       n => n.moduleId === moduleId && n.order === node.order + 1
     )
     if (nextNode && nextNode.status === 'locked') {
       nextNode.status = 'available'
+      run('UPDATE path_nodes SET status=? WHERE id=?', [nextNode.status, nextNode.id])
     }
-
-    saveToStorage()
   }
 
   function isNodeAccessible(moduleId: string, itemId: string): boolean {
@@ -138,7 +159,7 @@ export const useLearningPathStore = defineStore('learningPath', () => {
     const node = getNode(moduleId, itemId)
     if (node && node.status === 'available') {
       node.status = 'learning'
-      saveToStorage()
+      run('UPDATE path_nodes SET status=? WHERE id=?', [node.status, node.id])
     }
 
     const session: LearningSession = {
@@ -200,7 +221,7 @@ export const useLearningPathStore = defineStore('learningPath', () => {
     const node = getNode(currentSession.value.moduleId, currentSession.value.itemId)
     if (node && node.status === 'learning') {
       node.status = 'available'
-      saveToStorage()
+      run('UPDATE path_nodes SET status=? WHERE id=?', [node.status, node.id])
     }
     currentSession.value = null
   }
@@ -212,7 +233,7 @@ export const useLearningPathStore = defineStore('learningPath', () => {
 
   function resetModulePath(moduleId: string) {
     pathNodes.value = pathNodes.value.filter(n => n.moduleId !== moduleId)
-    saveToStorage()
+    run('DELETE FROM path_nodes WHERE module_id = ?', [moduleId])
   }
 
   loadFromStorage()
@@ -237,6 +258,6 @@ export const useLearningPathStore = defineStore('learningPath', () => {
     abandonSession,
     setCompanion,
     resetModulePath,
-    saveToStorage,
+    saveToStorage: loadFromStorage,
   }
 })

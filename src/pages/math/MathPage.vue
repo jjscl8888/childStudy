@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import TopBar from '@/components/layout/TopBar.vue'
 import ProgressBar from '@/components/common/ProgressBar.vue'
 import QuizOption from '@/components/common/QuizOption.vue'
@@ -8,8 +8,10 @@ import StarDisplay from '@/components/common/StarDisplay.vue'
 import { mathLevels, generateMathProblems } from '@/data/mathData'
 import type { MathProblem, MathLevel } from '@/data/mathData'
 import { useUserStore } from '@/stores/userStore'
+import { useTextToSpeech } from '@/composables/useTextToSpeech'
 
 const userStore = useUserStore()
+const tts = useTextToSpeech('zh-CN', 0.7)
 
 type ViewState = 'levels' | 'practice' | 'summary'
 
@@ -27,6 +29,31 @@ const currentProblem = computed(() => problems.value[currentIndex.value] ?? null
 
 const starsEarned = computed(() => correctCount.value)
 
+const praiseMessages = [
+  '太棒了！你真厉害！',
+  '完美！继续加油哦！',
+  '你真是数学小天才！',
+  '做得太好了！为你骄傲！',
+  '了不起！继续保持！',
+]
+
+function getRandomPraise(): string {
+  return praiseMessages[Math.floor(Math.random() * praiseMessages.length)]
+}
+
+function speakQuestion() {
+  if (!currentProblem.value) return
+  const q = currentProblem.value.question
+  const spoken = q.replace(/=/g, '等于').replace(/\+/g, '加').replace(/-/g, '减').replace(/×/g, '乘').replace(/÷/g, '除以')
+  setTimeout(() => {
+    tts.speak(spoken, { lang: 'zh-CN', rate: 0.7 })
+  }, 400)
+}
+
+watch(currentIndex, () => {
+  speakQuestion()
+})
+
 function startLevel(level: MathLevel) {
   selectedLevel.value = level
   problems.value = generateMathProblems(level.level, 5)
@@ -37,6 +64,12 @@ function startLevel(level: MathLevel) {
   feedbackType.value = null
   viewState.value = 'practice'
   userStore.startSession()
+  setTimeout(() => {
+    tts.speak(`开始${level.name}！认真算一算，选出正确答案。`, { lang: 'zh-CN', rate: 0.7 })
+  }, 400)
+  setTimeout(() => {
+    speakQuestion()
+  }, 2500)
 }
 
 function selectOption(option: number) {
@@ -47,8 +80,10 @@ function selectOption(option: number) {
   if (option === currentProblem.value!.answer) {
     correctCount.value++
     feedbackType.value = 'correct'
+    tts.speak('答对了！', { lang: 'zh-CN', rate: 0.8 })
   } else {
     feedbackType.value = 'wrong'
+    tts.speak('再想想哦', { lang: 'zh-CN', rate: 0.8 })
   }
 }
 
@@ -74,6 +109,17 @@ function finishPractice() {
     starsEarned: starsEarned.value,
     duration: 180,
   })
+
+  setTimeout(() => {
+    const ratio = correctCount.value / problems.value.length
+    if (ratio >= 0.8) {
+      tts.speak(`太厉害了！答对了${correctCount.value}道题！${getRandomPraise()}`, { lang: 'zh-CN', rate: 0.8 })
+    } else if (ratio >= 0.5) {
+      tts.speak(`不错哦！答对了${correctCount.value}道题！继续努力！`, { lang: 'zh-CN', rate: 0.8 })
+    } else {
+      tts.speak(`答对了${correctCount.value}道题。多练习几次会更好的，加油！`, { lang: 'zh-CN', rate: 0.8 })
+    }
+  }, 600)
 }
 
 function goBack() {
@@ -89,6 +135,10 @@ function restartLevel() {
     startLevel(selectedLevel.value)
   }
 }
+
+onUnmounted(() => {
+  tts.stop()
+})
 </script>
 
 <template>

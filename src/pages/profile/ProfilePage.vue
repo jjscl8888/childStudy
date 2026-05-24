@@ -53,7 +53,7 @@ function goToShop() {
 }
 
 function goToParent() {
-  router.push('/parent')
+  router.push('/admin/login')
 }
 </script>
 

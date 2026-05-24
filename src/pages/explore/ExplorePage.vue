@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import TopBar from '@/components/layout/TopBar.vue'
 import { exploreData } from '@/data/exploreData'
 import type { ExploreTopic } from '@/data/exploreData'
 import { useUserStore } from '@/stores/userStore'
 import { useContentStore } from '@/stores/contentStore'
+import { useTextToSpeech } from '@/composables/useTextToSpeech'
 
 const userStore = useUserStore()
 const contentStore = useContentStore()
+const tts = useTextToSpeech('zh-CN', 0.7)
 
 const allExploreData = computed(() => {
   return [...exploreData, ...contentStore.customContent.explore]
@@ -55,11 +57,20 @@ function openTopic(topic: ExploreTopic) {
       duration: 60,
     })
   }
+  setTimeout(() => {
+    tts.speak(`${topic.title}。${topic.content}`, { lang: 'zh-CN', rate: 0.75 })
+  }, 600)
 }
 
 function closeTopic() {
   expandedTopic.value = null
+  const praises = ['真棒！你又学到了新知识！', '太厉害了！继续探索吧！', '你真是好奇宝宝！']
+  tts.speak(praises[Math.floor(Math.random() * praises.length)], { lang: 'zh-CN', rate: 0.8 })
 }
+
+onUnmounted(() => {
+  tts.stop()
+})
 </script>
 
 <template>

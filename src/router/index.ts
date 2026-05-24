@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAdminStore } from '@/stores/adminStore'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -12,6 +13,11 @@ const router = createRouter({
       path: '/welcome',
       name: 'welcome',
       component: () => import('@/pages/WelcomePage.vue'),
+    },
+    {
+      path: '/admin/login',
+      name: 'admin-login',
+      component: () => import('@/pages/admin/AdminLoginPage.vue'),
     },
     {
       path: '/pinyin',
@@ -87,13 +93,24 @@ const router = createRouter({
       path: '/parent',
       name: 'parent',
       component: () => import('@/pages/parent/ParentPage.vue'),
+      meta: { requiresAdmin: true },
     },
     {
       path: '/parent/content',
       name: 'parent-content',
       component: () => import('@/pages/parent/ContentManagePage.vue'),
+      meta: { requiresAdmin: true },
     },
   ],
+})
+
+router.beforeEach((to) => {
+  if (to.meta.requiresAdmin) {
+    const adminStore = useAdminStore()
+    if (!adminStore.isLoggedIn) {
+      return { name: 'admin-login' }
+    }
+  }
 })
 
 export default router
