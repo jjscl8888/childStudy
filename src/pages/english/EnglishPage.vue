@@ -124,13 +124,7 @@ function playWord(event: Event, word: string) {
             class="mb-2 flex h-20 w-20 items-center justify-center overflow-hidden rounded-xl"
             style="background-color: #54A0FF15"
           >
-            <img
-              v-if="word.imageUrl"
-              :src="word.imageUrl"
-              :alt="word.word"
-              class="h-16 w-16 object-contain"
-            />
-            <span v-else class="text-3xl">📖</span>
+            <span class="text-4xl">{{ word.emoji }}</span>
           </div>
 
           <span class="text-lg font-bold" style="color: #2E86DE">{{ word.word }}</span>

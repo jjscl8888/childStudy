@@ -55,6 +55,11 @@ function goToShop() {
 function goToParent() {
   router.push('/admin/login')
 }
+
+function handleLogout() {
+  userStore.logout()
+  router.replace('/welcome')
+}
 </script>
 
 <template>
@@ -186,6 +191,13 @@ function goToParent() {
           @click="goToParent"
         >
           👨‍👩‍👧 家长中心
+        </button>
+
+        <button
+          class="fun-btn-secondary w-full text-lg"
+          @click="handleLogout"
+        >
+          🚪 退出登录
         </button>
       </div>
     </div>

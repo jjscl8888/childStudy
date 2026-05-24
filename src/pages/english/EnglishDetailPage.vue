@@ -375,9 +375,8 @@ onUnmounted(() => {
           <div class="fun-card flex flex-col items-center gap-5 py-8 w-full">
             <h3 class="text-xl font-bold text-gray-600">听音认字 🎵</h3>
 
-            <div class="flex h-40 w-40 items-center justify-center overflow-hidden rounded-3xl shadow-lg" style="background-color: #54A0FF18">
-              <img v-if="word.imageUrl" :src="word.imageUrl" :alt="word.word" class="h-36 w-36 object-contain" />
-              <span v-else class="text-7xl">📖</span>
+            <div class="flex h-40 w-40 items-center justify-center rounded-3xl shadow-lg" style="background-color: #54A0FF18">
+              <span class="text-8xl">{{ word.emoji }}</span>
             </div>
 
             <span class="font-bold text-gray-800" style="font-size: 56px; line-height: 1.1; color: #2E86DE">
@@ -525,9 +524,8 @@ onUnmounted(() => {
           <div class="fun-card flex flex-col items-center gap-5 py-8 w-full">
             <h3 class="text-xl font-bold text-gray-600">巩固游戏 🎯</h3>
 
-            <div class="flex h-28 w-28 items-center justify-center overflow-hidden rounded-2xl shadow-md" style="background-color: #54A0FF18">
-              <img v-if="word.imageUrl" :src="word.imageUrl" :alt="word.word" class="h-24 w-24 object-contain" />
-              <span v-else class="text-5xl">📖</span>
+            <div class="flex h-28 w-28 items-center justify-center rounded-2xl shadow-md" style="background-color: #54A0FF18">
+              <span class="text-6xl">{{ word.emoji }}</span>
             </div>
 
             <p class="text-lg font-bold text-gray-700">

@@ -386,11 +386,9 @@ onUnmounted(() => {
             </span>
 
             <div class="flex flex-col items-center gap-2">
-              <img
-                :src="item.imageUrl"
-                :alt="item.example"
-                class="h-32 w-32 rounded-2xl object-cover shadow-md"
-              />
+              <div class="flex h-32 w-32 items-center justify-center rounded-2xl shadow-md" style="background-color: #FF9F4318">
+                <span class="text-7xl">{{ item.emoji }}</span>
+              </div>
               <span class="text-2xl font-bold text-gray-700">{{ item.example }}</span>
               <span class="text-base text-gray-400">{{ item.examplePinyin }}</span>
             </div>

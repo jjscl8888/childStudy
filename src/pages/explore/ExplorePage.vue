@@ -100,13 +100,8 @@ onUnmounted(() => {
           class="w-full overflow-hidden rounded-2xl bg-white shadow-sm transition-all active:scale-[0.98]"
           @click="openTopic(topic)"
         >
-          <div class="relative h-36 w-full overflow-hidden">
-            <img
-              :src="topic.imageUrl"
-              :alt="topic.title"
-              class="h-full w-full object-cover"
-              loading="lazy"
-            />
+          <div class="relative h-36 w-full flex items-center justify-center" :style="{ backgroundColor: topic.color + '18' }">
+            <span class="text-7xl">{{ topic.icon }}</span>
             <div
               class="absolute left-3 top-3 flex h-10 w-10 items-center justify-center rounded-xl text-xl"
               :style="{ backgroundColor: topic.color + 'CC' }"
@@ -172,13 +167,8 @@ onUnmounted(() => {
             </div>
 
             <div class="px-5 pb-6">
-              <div class="mb-4 overflow-hidden rounded-2xl">
-                <img
-                  :src="expandedTopic.imageUrl"
-                  :alt="expandedTopic.title"
-                  class="h-48 w-full object-cover"
-                  loading="lazy"
-                />
+              <div class="mb-4 flex h-48 items-center justify-center rounded-2xl" :style="{ backgroundColor: expandedTopic.color + '18' }">
+                <span class="text-8xl">{{ expandedTopic.icon }}</span>
               </div>
 
               <span

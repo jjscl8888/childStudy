@@ -339,12 +339,8 @@ onUnmounted(() => {
 
             <p class="text-2xl font-bold" style="color: #2ED573">{{ character.pinyin }}</p>
 
-            <div v-if="character.imageUrl" class="h-36 w-48 overflow-hidden rounded-2xl shadow-md">
-              <img
-                :src="character.imageUrl"
-                :alt="character.character"
-                class="h-full w-full object-cover"
-              />
+            <div class="flex h-36 w-48 items-center justify-center rounded-2xl shadow-md" style="background-color: #2ED57318">
+              <span class="text-7xl">{{ character.emoji }}</span>
             </div>
 
             <button
@@ -543,12 +539,8 @@ onUnmounted(() => {
               <p class="mb-2 text-base font-bold text-gray-600">
                 哪个是 <span style="color: #2ED573; font-size: 28px">{{ character.character }}</span> ？
               </p>
-              <div v-if="character.imageUrl" class="mx-auto mb-2 h-28 w-36 overflow-hidden rounded-xl">
-                <img
-                  :src="character.imageUrl"
-                  :alt="character.character"
-                  class="h-full w-full object-cover"
-                />
+              <div class="mx-auto mb-2 flex h-28 w-36 items-center justify-center rounded-xl" style="background-color: #2ED57318">
+                <span class="text-5xl">{{ character.emoji }}</span>
               </div>
             </div>
 

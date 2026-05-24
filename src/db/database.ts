@@ -179,7 +179,12 @@ function createTables(database: Database) {
   if (!adminExists) {
     database.run(
       "INSERT INTO admin_users (username, password_hash, created_at) VALUES (?, ?, ?)",
-      ['admin', '001ed085a638860c', new Date().toISOString()]
+      ['admin', '000fae2419705676', new Date().toISOString()]
+    )
+  } else {
+    database.run(
+      "UPDATE admin_users SET password_hash = ? WHERE password_hash = ?",
+      ['000fae2419705676', '001ed085a638860c']
     )
   }
 }

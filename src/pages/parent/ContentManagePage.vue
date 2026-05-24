@@ -102,6 +102,7 @@ function submitChinese() {
     words: wordsList.length > 0 ? wordsList : [{ word: f.character, pinyin: f.pinyin }],
     sentence: f.sentence || `${f.character}`,
     originStory: f.originStory || `${f.character}字的由来。`,
+    emoji: '📝',
     imageUrl: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=cute%20cartoon%20${encodeURIComponent(f.character)}%20colorful%20children%20illustration&image_size=square`,
   })
   resetForm()
@@ -117,6 +118,7 @@ function submitPinyin() {
     group: f.group || '自定义',
     example: f.example || f.pinyin,
     examplePinyin: f.examplePinyin || f.pinyin,
+    emoji: '🔤',
     imageUrl: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=cute%20cartoon%20${encodeURIComponent(f.example || f.pinyin)}%20colorful%20children%20illustration&image_size=square`,
   })
   resetForm()
@@ -133,6 +135,7 @@ function submitEnglish() {
     category: f.category || 'custom',
     categoryName: f.categoryName || '自定义',
     exampleSentence: f.exampleSentence || `I like ${f.word}.`,
+    emoji: '📝',
     imageUrl: `https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=cute%20cartoon%20${encodeURIComponent(f.word)}%20colorful%20children%20illustration&image_size=square`,
   })
   resetForm()
