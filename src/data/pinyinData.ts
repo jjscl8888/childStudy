@@ -55,6 +55,7 @@ export const pinyinData: PinyinItem[] = [
   { id: 'ym-en', pinyin: 'en', type: 'yunmu', group: '前鼻韵母', example: '门', examplePinyin: 'mén', emoji: '🚪', imageUrl: img('cute cartoon door gate colorful children illustration') },
   { id: 'ym-in', pinyin: 'in', type: 'yunmu', group: '前鼻韵母', example: '森林', examplePinyin: 'sēn lín', emoji: '🌲', imageUrl: img('cute cartoon forest pine trees colorful children illustration') },
   { id: 'ym-un', pinyin: 'un', type: 'yunmu', group: '前鼻韵母', example: '云朵', examplePinyin: 'yún duǒ', emoji: '☁️', imageUrl: img('cute cartoon white clouds sky colorful children illustration') },
+  { id: 'ym-vn', pinyin: 'ün', type: 'yunmu', group: '前鼻韵母', example: '白云', examplePinyin: 'bái yún', emoji: '🌤️', imageUrl: img('cute cartoon white cloud sun blue sky colorful children illustration') },
   { id: 'ym-ang', pinyin: 'ang', type: 'yunmu', group: '后鼻韵母', example: '太阳', examplePinyin: 'tài yáng', emoji: '☀️', imageUrl: img('cute cartoon bright sun colorful children illustration') },
   { id: 'ym-eng', pinyin: 'eng', type: 'yunmu', group: '后鼻韵母', example: '风筝', examplePinyin: 'fēng zheng', emoji: '🪁', imageUrl: img('cute cartoon kite flying colorful children illustration') },
   { id: 'ym-ing', pinyin: 'ing', type: 'yunmu', group: '后鼻韵母', example: '星星', examplePinyin: 'xīng xing', emoji: '⭐', imageUrl: img('cute cartoon stars night sky colorful children illustration') },

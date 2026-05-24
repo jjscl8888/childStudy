@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue'
+import { Volume2 } from 'lucide-vue-next'
 import TopBar from '@/components/layout/TopBar.vue'
 import { exploreData } from '@/data/exploreData'
 import type { ExploreTopic } from '@/data/exploreData'
@@ -157,6 +158,13 @@ onUnmounted(() => {
               <div class="flex items-center gap-2">
                 <span class="text-2xl">{{ expandedTopic.icon }}</span>
                 <h2 class="text-xl font-bold text-gray-700">{{ expandedTopic.title }}</h2>
+                <button
+                  class="flex items-center justify-center rounded-full transition-all active:scale-90"
+                  style="background-color: #A55EEA18; color: #A55EEA; width: 32px; height: 32px"
+                  @click="tts.speak(`${expandedTopic.title}。${expandedTopic.content}`, { lang: 'zh-CN', rate: 0.75 })"
+                >
+                  <Volume2 class="h-4 w-4" />
+                </button>
               </div>
               <button
                 class="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-gray-100"

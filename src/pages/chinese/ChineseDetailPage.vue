@@ -483,9 +483,18 @@ onUnmounted(() => {
               <p class="text-lg leading-relaxed text-gray-700">{{ character.sentence }}</p>
             </div>
 
-            <p class="text-base font-bold text-gray-500">
-              哪个词含有 <span style="color: #2ED573; font-size: 24px">{{ character.character }}</span> ？
-            </p>
+            <div class="flex items-center gap-2">
+              <p class="text-base font-bold text-gray-500">
+                哪个词含有 <span style="color: #2ED573; font-size: 24px">{{ character.character }}</span> ？
+              </p>
+              <button
+                class="flex items-center justify-center rounded-full transition-all active:scale-90"
+                style="background-color: #2ED57318; color: #2ED573; width: 32px; height: 32px"
+                @click="speakText(`哪个词含有${character.character}`)"
+              >
+                <Volume2 class="h-4 w-4" />
+              </button>
+            </div>
 
             <div class="grid w-full grid-cols-2 gap-3">
               <button
@@ -536,9 +545,18 @@ onUnmounted(() => {
             <h3 class="text-xl font-bold text-gray-600">巩固挑战 🏆</h3>
 
             <div class="mb-2 rounded-2xl bg-white p-4 shadow-md text-center">
-              <p class="mb-2 text-base font-bold text-gray-600">
-                哪个是 <span style="color: #2ED573; font-size: 28px">{{ character.character }}</span> ？
-              </p>
+              <div class="flex items-center justify-center gap-2 mb-2">
+                <p class="text-base font-bold text-gray-600">
+                  哪个是 <span style="color: #2ED573; font-size: 28px">{{ character.character }}</span> ？
+                </p>
+                <button
+                  class="flex items-center justify-center rounded-full transition-all active:scale-90"
+                  style="background-color: #2ED57318; color: #2ED573; width: 32px; height: 32px"
+                  @click="speakText(`哪个是${character.character}`)"
+                >
+                  <Volume2 class="h-4 w-4" />
+                </button>
+              </div>
               <div class="mx-auto mb-2 flex h-28 w-36 items-center justify-center rounded-xl" style="background-color: #2ED57318">
                 <span class="text-5xl">{{ character.emoji }}</span>
               </div>

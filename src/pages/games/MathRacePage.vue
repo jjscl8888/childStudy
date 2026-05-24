@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { Volume2 } from 'lucide-vue-next'
 import TopBar from '@/components/layout/TopBar.vue'
 import RewardAnimation from '@/components/common/RewardAnimation.vue'
 import StarDisplay from '@/components/common/StarDisplay.vue'
 import { generateMathProblems } from '@/data/mathData'
 import type { MathProblem } from '@/data/mathData'
 import { useUserStore } from '@/stores/userStore'
+import { useTextToSpeech } from '@/composables/useTextToSpeech'
 
 const router = useRouter()
 const userStore = useUserStore()
+const tts = useTextToSpeech('zh-CN', 0.7)
 
 type ViewState = 'countdown' | 'playing' | 'result'
 
@@ -28,6 +31,13 @@ let countdownInterval: ReturnType<typeof setInterval> | null = null
 const currentProblem = computed(() => problems.value[currentIndex.value] ?? null)
 
 const starsEarned = computed(() => correctCount.value)
+
+function speakQuestion() {
+  if (!currentProblem.value) return
+  const q = currentProblem.value.question
+  const spoken = q.replace(/=/g, '等于').replace(/\+/g, '加').replace(/-/g, '减').replace(/×/g, '乘').replace(/÷/g, '除以')
+  tts.speak(spoken, { lang: 'zh-CN', rate: 0.7 })
+}
 
 const formattedTime = computed(() => {
   const mins = Math.floor(timeElapsed.value / 60)
@@ -133,6 +143,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  tts.stop()
   if (timerInterval) {
     clearInterval(timerInterval)
     timerInterval = null
@@ -190,9 +201,18 @@ onUnmounted(() => {
           <div class="mb-3 text-center text-2xl tracking-widest">
             {{ currentProblem.visualAid }}
           </div>
-          <p class="text-center text-4xl font-bold" style="color: #FF6B6B">
-            {{ currentProblem.question }}
-          </p>
+          <div class="flex items-center justify-center gap-2">
+            <p class="text-center text-4xl font-bold" style="color: #FF6B6B">
+              {{ currentProblem.question }}
+            </p>
+            <button
+              class="flex items-center justify-center rounded-full transition-all active:scale-90"
+              style="background-color: #FF6B6B18; color: #FF6B6B; width: 32px; height: 32px"
+              @click="speakQuestion"
+            >
+              <Volume2 class="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div class="grid grid-cols-2 gap-3">

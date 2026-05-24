@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { Volume2 } from 'lucide-vue-next'
 import TopBar from '@/components/layout/TopBar.vue'
 import ProgressBar from '@/components/common/ProgressBar.vue'
 import RewardAnimation from '@/components/common/RewardAnimation.vue'
@@ -11,9 +12,11 @@ import { englishData } from '@/data/englishData'
 import { generateMathProblems } from '@/data/mathData'
 import type { MathProblem } from '@/data/mathData'
 import { useUserStore } from '@/stores/userStore'
+import { useTextToSpeech } from '@/composables/useTextToSpeech'
 
 const router = useRouter()
 const userStore = useUserStore()
+const tts = useTextToSpeech('zh-CN', 0.7)
 
 interface QuizQuestion {
   id: string
@@ -22,6 +25,7 @@ interface QuizQuestion {
   options: string[]
   correctIndex: number
   imageUrl?: string
+  emoji?: string
   visualAid?: string
 }
 
@@ -35,6 +39,7 @@ const correctCount = ref(0)
 const showReward = ref(false)
 const starAnimation = ref(false)
 const starAnimationKey = ref(0)
+const imageLoadError = ref(false)
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -65,6 +70,8 @@ function generateQuestions(): QuizQuestion[] {
       question: `哪个拼音是"${item.example}"？`,
       options,
       correctIndex: options.indexOf(item.pinyin),
+      imageUrl: item.imageUrl,
+      emoji: item.emoji,
     })
   }
 
@@ -82,6 +89,7 @@ function generateQuestions(): QuizQuestion[] {
       options,
       correctIndex: options.indexOf(item.character),
       imageUrl: item.imageUrl,
+      emoji: item.emoji,
     })
   }
 
@@ -99,6 +107,7 @@ function generateQuestions(): QuizQuestion[] {
       options,
       correctIndex: options.indexOf(item.word),
       imageUrl: item.imageUrl,
+      emoji: item.emoji,
     })
   }
 
@@ -139,6 +148,18 @@ const typeLabel: Record<string, string> = {
   math: '🔢 数学',
 }
 
+function speakQuestion() {
+  if (!currentQuestion.value) return
+  const q = currentQuestion.value.question
+  const spoken = q.replace(/=/g, '等于').replace(/\+/g, '加').replace(/-/g, '减').replace(/×/g, '乘').replace(/÷/g, '除以')
+  const lang = currentQuestion.value.type === 'english' ? 'en-US' : 'zh-CN'
+  tts.speak(spoken, { lang, rate: 0.7 })
+}
+
+function onImageError() {
+  imageLoadError.value = true
+}
+
 function selectOption(index: number) {
   if (revealed.value) return
   selectedIndex.value = index
@@ -163,6 +184,7 @@ function nextQuestion() {
     currentIndex.value++
     selectedIndex.value = null
     revealed.value = false
+    imageLoadError.value = false
   } else {
     finishQuiz()
   }
@@ -189,6 +211,7 @@ function restart() {
   currentIndex.value = 0
   selectedIndex.value = null
   revealed.value = false
+  imageLoadError.value = false
   correctCount.value = 0
   viewState.value = 'playing'
   showReward.value = false
@@ -223,17 +246,33 @@ function goBack() {
 
         <div class="mb-5 rounded-2xl bg-white p-5 shadow-sm">
           <img
-            v-if="currentQuestion.imageUrl"
+            v-if="currentQuestion.imageUrl && !imageLoadError"
             :src="currentQuestion.imageUrl"
             :alt="currentQuestion.question"
             class="mx-auto mb-3 h-32 w-32 rounded-xl object-cover"
+            @error="onImageError"
           />
+          <div
+            v-else-if="currentQuestion.emoji"
+            class="mx-auto mb-3 flex h-32 w-32 items-center justify-center rounded-xl bg-orange-50 text-6xl"
+          >
+            {{ currentQuestion.emoji }}
+          </div>
           <div v-if="currentQuestion.visualAid" class="mb-2 text-center text-2xl tracking-widest">
             {{ currentQuestion.visualAid }}
           </div>
-          <p class="text-center text-xl font-bold text-gray-700">
-            {{ currentQuestion.question }}
-          </p>
+          <div class="flex items-center justify-center gap-2">
+            <p class="text-center text-xl font-bold text-gray-700">
+              {{ currentQuestion.question }}
+            </p>
+            <button
+              class="flex items-center justify-center rounded-full transition-all active:scale-90"
+              style="background-color: #FF9F4318; color: #FF9F43; width: 32px; height: 32px"
+              @click="speakQuestion"
+            >
+              <Volume2 class="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div class="space-y-3">

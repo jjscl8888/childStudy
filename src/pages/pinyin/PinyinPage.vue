@@ -1,25 +1,49 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { CheckCircle, Lock, Star, Play } from 'lucide-vue-next'
+import { CheckCircle, Lock, Star, Play, Volume2 } from 'lucide-vue-next'
 import TopBar from '@/components/layout/TopBar.vue'
 import ProgressBar from '@/components/common/ProgressBar.vue'
 import { pinyinData } from '@/data/pinyinData'
 import { useUserStore } from '@/stores/userStore'
 import { useLearningPathStore } from '@/stores/learningPathStore'
 import { useSpacedRepetitionStore } from '@/stores/spacedRepetitionStore'
+import { useTextToSpeech } from '@/composables/useTextToSpeech'
 
 const router = useRouter()
 const userStore = useUserStore()
 const learningPathStore = useLearningPathStore()
 const spacedRepetition = useSpacedRepetitionStore()
+const tts = useTextToSpeech('zh-CN', 0.6)
+const speakingId = ref<string | null>(null)
 
-const activeTab = ref<'path' | 'review'>('path')
+const activeTab = ref<'path' | 'category' | 'review'>('path')
 
 const tabs = [
   { key: 'path' as const, label: '学习路径', icon: '🗺️' },
+  { key: 'category' as const, label: '分类浏览', icon: '📂' },
   { key: 'review' as const, label: '复习巩固', icon: '🔄' },
 ]
+
+const categoryType = ref<'shengmu' | 'yunmu' | 'zhengti'>('shengmu')
+
+const categoryTabs = [
+  { key: 'shengmu' as const, label: '声母', icon: '🗣️', color: '#FF9F43' },
+  { key: 'yunmu' as const, label: '韵母', icon: '🎵', color: '#54A0FF' },
+  { key: 'zhengti' as const, label: '整体认读', icon: '📖', color: '#2ED573' },
+]
+
+const categoryGroups = computed(() => {
+  const type = categoryType.value
+  const items = pinyinData.filter(p => p.type === type)
+  const groupMap = new Map<string, typeof items>()
+  items.forEach(item => {
+    const g = item.group
+    if (!groupMap.has(g)) groupMap.set(g, [])
+    groupMap.get(g)!.push(item)
+  })
+  return Array.from(groupMap.entries()).map(([name, items]) => ({ name, items }))
+})
 
 onMounted(() => {
   learningPathStore.initModulePath('pinyin', pinyinData)
@@ -51,6 +75,14 @@ const reviewItems = computed(() => {
 })
 
 const overdueCount = computed(() => reviewItems.value.filter(r => r.isDue).length)
+
+function playPinyin(p: { id: string; pinyin: string; example: string }) {
+  speakingId.value = p.id
+  tts.speak(p.pinyin, { lang: 'zh-CN', rate: 0.6 })
+  setTimeout(() => {
+    speakingId.value = null
+  }, 1200)
+}
 
 function goToDetail(itemId: string) {
   if (!learningPathStore.isNodeAccessible('pinyin', itemId)) return
@@ -204,6 +236,63 @@ function getStatusColor(status: string) {
               class="ml-6 h-4 w-0.5"
               :style="{ backgroundColor: node.status === 'completed' ? '#2ED573' : '#E5E7EB' }"
             />
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="activeTab === 'category'">
+        <div class="mb-4 flex gap-2">
+          <button
+            v-for="ct in categoryTabs"
+            :key="ct.key"
+            class="flex items-center gap-1.5 shrink-0 rounded-full px-4 py-2 text-sm font-bold transition-all duration-200"
+            :class="categoryType === ct.key ? 'text-white shadow-md' : 'bg-white border-2 border-gray-100'"
+            :style="categoryType === ct.key ? { backgroundColor: ct.color } : { color: '#9CA3AF' }"
+            @click="categoryType = ct.key"
+          >
+            {{ ct.icon }} {{ ct.label }}
+          </button>
+        </div>
+
+        <div v-for="group in categoryGroups" :key="group.name" class="mb-5">
+          <div class="mb-2 flex items-center gap-2">
+            <span
+              class="inline-block rounded-full px-3 py-1 text-xs font-bold text-white"
+              :style="{ backgroundColor: categoryTabs.find(t => t.key === categoryType)?.color }"
+            >
+              {{ group.name }}
+            </span>
+            <span class="text-xs text-gray-400">{{ group.items.length }}个</span>
+          </div>
+
+          <div class="grid grid-cols-4 gap-2">
+            <button
+              v-for="p in group.items"
+              :key="p.id"
+              class="flex flex-col items-center gap-1 rounded-2xl border-2 bg-white p-3 transition-all duration-200 active:scale-95"
+              :style="{ borderColor: (categoryTabs.find(t => t.key === categoryType)?.color || '#FF9F43') + '30' }"
+              @click="goToDetail(p.id)"
+            >
+              <span
+                class="text-2xl font-bold"
+                :style="{ color: categoryTabs.find(t => t.key === categoryType)?.color }"
+              >
+                {{ p.pinyin }}
+              </span>
+              <span class="text-lg">{{ p.emoji }}</span>
+              <span class="text-[10px] text-gray-400 truncate w-full text-center">{{ p.example }}</span>
+              <button
+                class="mt-1 flex h-6 w-6 items-center justify-center rounded-full transition-all active:scale-90"
+                :class="speakingId === p.id ? 'animate-pulse' : ''"
+                :style="{
+                  backgroundColor: (categoryTabs.find(t => t.key === categoryType)?.color || '#FF9F43') + '18',
+                  color: categoryTabs.find(t => t.key === categoryType)?.color || '#FF9F43',
+                }"
+                @click.stop="playPinyin(p)"
+              >
+                <Volume2 class="h-3.5 w-3.5" />
+              </button>
+            </button>
           </div>
         </div>
       </div>

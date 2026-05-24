@@ -528,9 +528,18 @@ onUnmounted(() => {
               <span class="text-6xl">{{ word.emoji }}</span>
             </div>
 
-            <p class="text-lg font-bold text-gray-700">
-              哪个是 <span style="color: #2E86DE; font-size: 28px">{{ word.chinese }}</span> 的英文？
-            </p>
+            <div class="flex items-center gap-2">
+              <p class="text-lg font-bold text-gray-700">
+                哪个是 <span style="color: #2E86DE; font-size: 28px">{{ word.chinese }}</span> 的英文？
+              </p>
+              <button
+                class="flex items-center justify-center rounded-full transition-all active:scale-90"
+                style="background-color: #54A0FF18; color: #54A0FF; width: 32px; height: 32px"
+                @click="tts.speak(`哪个是${word.chinese}的英文`, { lang: 'zh-CN', rate: 0.7 })"
+              >
+                <Volume2 class="h-4 w-4" />
+              </button>
+            </div>
 
             <div class="grid w-full max-w-sm grid-cols-2 gap-3">
               <button
@@ -570,9 +579,18 @@ onUnmounted(() => {
           <div class="fun-card flex flex-col items-center gap-5 py-8 w-full">
             <h3 class="text-xl font-bold text-gray-600">复习挑战 🏆</h3>
 
-            <span class="font-bold" style="font-size: 48px; line-height: 1.1; color: #2E86DE">
-              {{ word.word }}
-            </span>
+            <div class="flex items-center gap-2">
+              <span class="font-bold" style="font-size: 48px; line-height: 1.1; color: #2E86DE">
+                {{ word.word }}
+              </span>
+              <button
+                class="flex items-center justify-center rounded-full transition-all active:scale-90"
+                style="background-color: #54A0FF18; color: #54A0FF; width: 32px; height: 32px"
+                @click="tts.speak(`${word.word}，这个单词是什么意思`, { lang: 'zh-CN', rate: 0.7 })"
+              >
+                <Volume2 class="h-4 w-4" />
+              </button>
+            </div>
             <p class="text-sm text-gray-400">这个单词是什么意思？</p>
 
             <div class="grid w-full max-w-sm grid-cols-2 gap-3">

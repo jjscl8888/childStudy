@@ -518,9 +518,18 @@ onUnmounted(() => {
           <div class="fun-card flex flex-col items-center gap-5 py-8 w-full">
             <h3 class="text-xl font-bold text-gray-600">巩固游戏 🎯</h3>
 
-            <p class="text-lg font-bold text-gray-700">
-              哪个是 <span style="color: #FF9F43; font-size: 28px">{{ item.pinyin }}</span> ？
-            </p>
+            <div class="flex items-center gap-2">
+              <p class="text-lg font-bold text-gray-700">
+                哪个是 <span style="color: #FF9F43; font-size: 28px">{{ item.pinyin }}</span> ？
+              </p>
+              <button
+                class="flex items-center justify-center rounded-full transition-all active:scale-90"
+                style="background-color: #FF9F4318; color: #FF9F43; width: 32px; height: 32px"
+                @click="tts.speak(`哪个是${item.pinyin}`, { lang: 'zh-CN', rate: 0.7 })"
+              >
+                <Volume2 class="h-4 w-4" />
+              </button>
+            </div>
 
             <div class="grid w-full max-w-sm grid-cols-2 gap-3">
               <button
@@ -566,7 +575,16 @@ onUnmounted(() => {
             <h3 class="text-xl font-bold text-gray-600">复习挑战 🏆</h3>
 
             <div class="flex flex-col items-center gap-2 mb-2">
-              <span class="text-5xl font-bold" style="color: #FF9F43">{{ item.pinyin }}</span>
+              <div class="flex items-center gap-2">
+                <span class="text-5xl font-bold" style="color: #FF9F43">{{ item.pinyin }}</span>
+                <button
+                  class="flex items-center justify-center rounded-full transition-all active:scale-90"
+                  style="background-color: #FF9F4318; color: #FF9F43; width: 32px; height: 32px"
+                  @click="tts.speak(`${item.pinyin}，这个拼音对应哪个词`, { lang: 'zh-CN', rate: 0.7 })"
+                >
+                  <Volume2 class="h-4 w-4" />
+                </button>
+              </div>
               <span class="text-sm text-gray-400">这个拼音对应哪个词？</span>
             </div>
 

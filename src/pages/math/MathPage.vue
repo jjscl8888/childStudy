@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
+import { Volume2 } from 'lucide-vue-next'
 import TopBar from '@/components/layout/TopBar.vue'
 import ProgressBar from '@/components/common/ProgressBar.vue'
 import QuizOption from '@/components/common/QuizOption.vue'
@@ -208,9 +209,18 @@ onUnmounted(() => {
           <div class="mb-3 text-center text-3xl tracking-widest">
             {{ currentProblem.visualAid }}
           </div>
-          <p class="text-center text-4xl font-bold" style="color: #FF6B6B">
-            {{ currentProblem.question }}
-          </p>
+          <div class="flex items-center justify-center gap-2">
+            <p class="text-center text-4xl font-bold" style="color: #FF6B6B">
+              {{ currentProblem.question }}
+            </p>
+            <button
+              class="flex items-center justify-center rounded-full transition-all active:scale-90"
+              style="background-color: #FF6B6B18; color: #FF6B6B; width: 32px; height: 32px"
+              @click="speakQuestion"
+            >
+              <Volume2 class="h-4 w-4" />
+            </button>
+          </div>
         </div>
 
         <div class="mt-4 space-y-3">
