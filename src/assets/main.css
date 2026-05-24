@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply text-gray-800 antialiased;
+    overflow-x: hidden;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-warm-dark rounded-full;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/40 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/60;
+  }
+}
+
+@layer components {
+  .fun-btn {
+    @apply inline-flex items-center justify-center px-6 py-3 rounded-xl3 font-bold text-lg
+           shadow-[0_4px_0_rgba(0,0,0,0.15)] active:shadow-[0_2px_0_rgba(0,0,0,0.15)]
+           active:translate-y-[2px] transition-all duration-150 select-none;
+  }
+  .fun-btn-primary {
+    @apply fun-btn bg-primary text-white hover:bg-primary-dark;
+  }
+  .fun-btn-secondary {
+    @apply fun-btn bg-secondary text-white hover:bg-secondary-dark;
+  }
+  .fun-btn-accent {
+    @apply fun-btn bg-accent text-white hover:bg-accent-dark;
+  }
+  .fun-btn-success {
+    @apply fun-btn bg-success text-white hover:bg-green-600;
+  }
+  .fun-card {
+    @apply bg-white rounded-xl4 p-6 shadow-lg border-2 border-gray-100
+           hover:shadow-xl transition-shadow duration-300;
+  }
+  .fun-card-hover {
+    @apply fun-card hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 cursor-pointer;
+  }
+  .fun-input {
+    @apply w-full px-4 py-3 rounded-xl2 border-2 border-gray-200 text-lg
+           focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all;
+  }
+  .star-badge {
+    @apply inline-flex items-center gap-1 px-3 py-1 rounded-full bg-yellow-100 text-yellow-700 font-bold;
+  }
+  .module-badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold;
+  }
+}
+
+@layer utilities {
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  .text-shadow-lg {
+    text-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  }
+}

@@ -1,0 +1,76 @@
+# Dependencies
+node_modules/
+vendor/
+**/venv/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+
+# Build output
+dist/
+build/
+out/
+release/
+.next/
+*.o
+*.a
+*.so
+*.class
+
+# Source maps
+*.js.map
+*.ts.map
+*.css.map
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+.netrc
+
+# IDE / Editor
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.suo
+*.user
+*.useropt
+*.userprefs
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+._*
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Temp & cache
+*.tmp
+*.temp
+*.bak
+wget-log
+
+# Trae IDE skills (auto-generated)
+.trae/
+
+# Generated documents (weiChat output, credentials)
+document/weiChat/
+document/skill
+
+# Standalone projects with own git
+project/llm_proxy/
