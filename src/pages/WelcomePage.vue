@@ -2,9 +2,13 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useLearningPathStore } from '@/stores/learningPathStore'
+import { useSpacedRepetitionStore } from '@/stores/spacedRepetitionStore'
 
 const router = useRouter()
 const userStore = useUserStore()
+const learningPathStore = useLearningPathStore()
+const spacedRepetition = useSpacedRepetitionStore()
 
 const nameInput = ref('')
 const selectedAvatar = ref('')
@@ -16,11 +20,15 @@ function handleCreateUser() {
   const name = nameInput.value.trim()
   if (!name || !selectedAvatar.value) return
   userStore.createUser(name, selectedAvatar.value)
+  learningPathStore.saveToStorage()
+  spacedRepetition.saveToStorage()
   router.push('/')
 }
 
 function handleSelectUser(userId: string) {
   userStore.selectUser(userId)
+  learningPathStore.saveToStorage()
+  spacedRepetition.saveToStorage()
   router.push('/')
 }
 

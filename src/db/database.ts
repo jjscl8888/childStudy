@@ -46,6 +46,46 @@ async function saveToIDB(data: Uint8Array): Promise<void> {
   })
 }
 
+function migrateAddUserId(database: Database) {
+  const tablesNeedingUserId = [
+    { table: 'learning_records', column: 'user_id' },
+    { table: 'achievements', column: 'user_id' },
+    { table: 'review_items', column: 'user_id' },
+    { table: 'path_nodes', column: 'user_id' },
+    { table: 'today_minutes', column: 'user_id' },
+  ]
+
+  for (const { table, column } of tablesNeedingUserId) {
+    try {
+      const info = database.prepare(`PRAGMA table_info(${table})`)
+      const columns: string[] = []
+      while (info.step()) {
+        const row = info.getAsObject() as { name: string }
+        columns.push(row.name)
+      }
+      info.free()
+
+      if (!columns.includes(column)) {
+        database.run(`ALTER TABLE ${table} ADD COLUMN ${column} TEXT NOT NULL DEFAULT ''`)
+
+        const firstUser = database.prepare("SELECT id FROM users ORDER BY created_at LIMIT 1")
+        let firstUserId = ''
+        if (firstUser.step()) {
+          const row = firstUser.getAsObject() as { id: string }
+          firstUserId = row.id
+        }
+        firstUser.free()
+
+        if (firstUserId) {
+          database.run(`UPDATE ${table} SET ${column} = ? WHERE ${column} = ''`, [firstUserId])
+        }
+      }
+    } catch {
+      // table may not exist yet
+    }
+  }
+}
+
 function createTables(database: Database) {
   database.run(`
     CREATE TABLE IF NOT EXISTS users (
@@ -69,6 +109,7 @@ function createTables(database: Database) {
   database.run(`
     CREATE TABLE IF NOT EXISTS learning_records (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
       module TEXT NOT NULL,
       topic TEXT NOT NULL,
       action TEXT NOT NULL,
@@ -82,6 +123,7 @@ function createTables(database: Database) {
   database.run(`
     CREATE TABLE IF NOT EXISTS achievements (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
       code TEXT NOT NULL,
       name TEXT NOT NULL,
       description TEXT NOT NULL,
@@ -95,6 +137,7 @@ function createTables(database: Database) {
   database.run(`
     CREATE TABLE IF NOT EXISTS today_minutes (
       id INTEGER PRIMARY KEY CHECK (id = 1),
+      user_id TEXT NOT NULL,
       date TEXT NOT NULL,
       minutes REAL NOT NULL DEFAULT 0
     )
@@ -111,6 +154,7 @@ function createTables(database: Database) {
   database.run(`
     CREATE TABLE IF NOT EXISTS review_items (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
       module_id TEXT NOT NULL,
       item_id TEXT NOT NULL,
       level INTEGER NOT NULL DEFAULT 0,
@@ -125,6 +169,7 @@ function createTables(database: Database) {
   database.run(`
     CREATE TABLE IF NOT EXISTS path_nodes (
       id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
       module_id TEXT NOT NULL,
       item_id TEXT NOT NULL,
       order_num INTEGER NOT NULL,
@@ -187,6 +232,8 @@ function createTables(database: Database) {
       ['000fae2419705676', '001ed085a638860c']
     )
   }
+
+  migrateAddUserId(database)
 }
 
 export async function initDatabase(): Promise<Database> {

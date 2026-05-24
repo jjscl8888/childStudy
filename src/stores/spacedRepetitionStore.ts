@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useUserStore } from './userStore'
 import { query, run } from '@/db/database'
 
 export interface ReviewItem {
@@ -43,6 +44,8 @@ function rowToReviewItem(row: ReviewRow): ReviewItem {
 const INTERVALS = [1, 2, 4, 7, 15, 30]
 
 export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
+  const userStore = useUserStore()
+
   const reviewItems = ref<ReviewItem[]>([])
 
   const todayReviews = computed(() => {
@@ -61,11 +64,22 @@ export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
   const reviewCount = computed(() => overdueReviews.value.length)
 
   function loadFromStorage() {
-    const rows = query<ReviewRow>('SELECT * FROM review_items')
+    if (!userStore.currentUser) {
+      reviewItems.value = []
+      return
+    }
+
+    const rows = query<ReviewRow>(
+      'SELECT * FROM review_items WHERE user_id = ?',
+      [userStore.currentUser.id]
+    )
     reviewItems.value = rows.map(rowToReviewItem)
   }
 
   function addReviewItem(moduleId: string, itemId: string) {
+    if (!userStore.currentUser) return
+    const userId = userStore.currentUser.id
+
     const existing = reviewItems.value.find(
       r => r.moduleId === moduleId && r.itemId === itemId
     )
@@ -76,7 +90,7 @@ export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
     nextReview.setDate(nextReview.getDate() + INTERVALS[0])
 
     const item: ReviewItem = {
-      id: `${moduleId}-${itemId}`,
+      id: `${userId}-${moduleId}-${itemId}`,
       moduleId,
       itemId,
       level: 0,
@@ -89,8 +103,8 @@ export const useSpacedRepetitionStore = defineStore('spacedRepetition', () => {
 
     reviewItems.value.push(item)
     run(
-      'INSERT INTO review_items (id, module_id, item_id, level, next_review, last_review, review_count, ease_factor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [item.id, item.moduleId, item.itemId, item.level, item.nextReview, item.lastReview, item.reviewCount, item.easeFactor, item.createdAt]
+      'INSERT INTO review_items (id, user_id, module_id, item_id, level, next_review, last_review, review_count, ease_factor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [item.id, userId, item.moduleId, item.itemId, item.level, item.nextReview, item.lastReview, item.reviewCount, item.easeFactor, item.createdAt]
     )
   }
 

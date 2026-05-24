@@ -134,13 +134,35 @@ export const useUserStore = defineStore('user', () => {
       currentUser.value = users.value.find(u => u.id === currentRow.user_id) ?? null
     }
 
-    const recordRows = query<RecordRow>('SELECT * FROM learning_records ORDER BY created_at')
+    loadUserData()
+  }
+
+  function loadUserData() {
+    if (!currentUser.value) {
+      learningRecords.value = []
+      achievements.value = []
+      todayMinutes.value = 0
+      return
+    }
+
+    const userId = currentUser.value.id
+
+    const recordRows = query<RecordRow>(
+      'SELECT * FROM learning_records WHERE user_id = ? ORDER BY created_at',
+      [userId]
+    )
     learningRecords.value = recordRows.map(rowToRecord)
 
-    const achRows = query<AchievementRow>('SELECT * FROM achievements')
+    const achRows = query<AchievementRow>(
+      'SELECT * FROM achievements WHERE user_id = ?',
+      [userId]
+    )
     achievements.value = achRows.map(rowToAchievement)
 
-    const minsRow = queryOne<TodayMinutesRow>('SELECT date, minutes FROM today_minutes WHERE id = 1')
+    const minsRow = queryOne<TodayMinutesRow>(
+      'SELECT date, minutes FROM today_minutes WHERE user_id = ?',
+      [userId]
+    )
     if (minsRow) {
       const today = new Date().toDateString()
       if (minsRow.date === today) {
@@ -148,6 +170,8 @@ export const useUserStore = defineStore('user', () => {
       } else {
         todayMinutes.value = 0
       }
+    } else {
+      todayMinutes.value = 0
     }
   }
 
@@ -159,10 +183,12 @@ export const useUserStore = defineStore('user', () => {
         currentUser.value.streak, currentUser.value.id,
       ])
       run('INSERT OR REPLACE INTO current_user (id, user_id) VALUES (1, ?)', [currentUser.value.id])
-    }
 
-    const today = new Date().toDateString()
-    run('INSERT OR REPLACE INTO today_minutes (id, date, minutes) VALUES (1, ?, ?)', [today, todayMinutes.value])
+      const today = new Date().toDateString()
+      run('INSERT OR REPLACE INTO today_minutes (id, user_id, date, minutes) VALUES (1, ?, ?, ?)', [
+        currentUser.value.id, today, todayMinutes.value,
+      ])
+    }
   }
 
   function createUser(name: string, avatar: string) {
@@ -183,6 +209,7 @@ export const useUserStore = defineStore('user', () => {
     currentUser.value = user
     run('INSERT OR REPLACE INTO current_user (id, user_id) VALUES (1, ?)', [user.id])
     initAchievements(user.id)
+    loadUserData()
     return user
   }
 
@@ -191,6 +218,7 @@ export const useUserStore = defineStore('user', () => {
     if (currentUser.value) {
       run('INSERT OR REPLACE INTO current_user (id, user_id) VALUES (1, ?)', [currentUser.value.id])
     }
+    loadUserData()
   }
 
   function selectUser(userId: string) {
@@ -198,6 +226,7 @@ export const useUserStore = defineStore('user', () => {
     if (currentUser.value) {
       run('INSERT OR REPLACE INTO current_user (id, user_id) VALUES (1, ?)', [currentUser.value.id])
     }
+    loadUserData()
   }
 
   function addStars(count: number) {
@@ -211,14 +240,15 @@ export const useUserStore = defineStore('user', () => {
   }
 
   function addLearningRecord(record: Omit<LearningRecord, 'id' | 'createdAt'>) {
+    if (!currentUser.value) return
     const newRecord: LearningRecord = {
       ...record,
       id: Date.now().toString(),
       createdAt: new Date().toISOString(),
     }
     run(
-      'INSERT INTO learning_records (id, module, topic, action, score, stars_earned, duration, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-      [newRecord.id, newRecord.module, newRecord.topic, newRecord.action, newRecord.score, newRecord.starsEarned, newRecord.duration, newRecord.createdAt]
+      'INSERT INTO learning_records (id, user_id, module, topic, action, score, stars_earned, duration, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [newRecord.id, currentUser.value.id, newRecord.module, newRecord.topic, newRecord.action, newRecord.score, newRecord.starsEarned, newRecord.duration, newRecord.createdAt]
     )
     learningRecords.value.push(newRecord)
     if (record.starsEarned > 0) {
@@ -239,25 +269,25 @@ export const useUserStore = defineStore('user', () => {
     saveToStorage()
   }
 
-  function initAchievements(_userId: string) {
+  function initAchievements(userId: string) {
     const defaultAchievements: Achievement[] = [
-      { id: '1', code: 'first_learn', name: '初学者', description: '完成第一次学习', icon: '🌟', category: 'general', unlocked: false },
-      { id: '2', code: 'pinyin_master', name: '拼音小能手', description: '学习10个拼音', icon: '📝', category: 'pinyin', unlocked: false },
-      { id: '3', code: 'chinese_star', name: '识字之星', description: '学习10个汉字', icon: '📖', category: 'chinese', unlocked: false },
-      { id: '4', code: 'english_hero', name: '英语小英雄', description: '学习10个英语单词', icon: '🌍', category: 'english', unlocked: false },
-      { id: '5', code: 'math_genius', name: '数学小天才', description: '完成10道数学题', icon: '🔢', category: 'math', unlocked: false },
-      { id: '6', code: 'streak_7', name: '坚持之星', description: '连续学习7天', icon: '🔥', category: 'general', unlocked: false },
-      { id: '7', code: 'star_100', name: '星星收集家', description: '累计获得100颗星星', icon: '⭐', category: 'general', unlocked: false },
-      { id: '8', code: 'perfect_quiz', name: '满分达人', description: '一次测验全部答对', icon: '🏆', category: 'general', unlocked: false },
+      { id: `${userId}-1`, code: 'first_learn', name: '初学者', description: '完成第一次学习', icon: '🌟', category: 'general', unlocked: false },
+      { id: `${userId}-2`, code: 'pinyin_master', name: '拼音小能手', description: '学习10个拼音', icon: '📝', category: 'pinyin', unlocked: false },
+      { id: `${userId}-3`, code: 'chinese_star', name: '识字之星', description: '学习10个汉字', icon: '📖', category: 'chinese', unlocked: false },
+      { id: `${userId}-4`, code: 'english_hero', name: '英语小英雄', description: '学习10个英语单词', icon: '🌍', category: 'english', unlocked: false },
+      { id: `${userId}-5`, code: 'math_genius', name: '数学小天才', description: '完成10道数学题', icon: '🔢', category: 'math', unlocked: false },
+      { id: `${userId}-6`, code: 'streak_7', name: '坚持之星', description: '连续学习7天', icon: '🔥', category: 'general', unlocked: false },
+      { id: `${userId}-7`, code: 'star_100', name: '星星收集家', description: '累计获得100颗星星', icon: '⭐', category: 'general', unlocked: false },
+      { id: `${userId}-8`, code: 'perfect_quiz', name: '满分达人', description: '一次测验全部答对', icon: '🏆', category: 'general', unlocked: false },
     ]
     achievements.value = defaultAchievements
 
-    run('DELETE FROM achievements')
+    run('DELETE FROM achievements WHERE user_id = ?', [userId])
     const stmt = getDatabase().prepare(
-      'INSERT INTO achievements (id, code, name, description, icon, category, unlocked, unlocked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO achievements (id, user_id, code, name, description, icon, category, unlocked, unlocked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
     for (const ach of defaultAchievements) {
-      stmt.run([ach.id, ach.code, ach.name, ach.description, ach.icon, ach.category, 0, null])
+      stmt.run([ach.id, userId, ach.code, ach.name, ach.description, ach.icon, ach.category, 0, null])
     }
     stmt.free()
     schedulePersist()
@@ -306,6 +336,9 @@ export const useUserStore = defineStore('user', () => {
 
   function logout() {
     currentUser.value = null
+    learningRecords.value = []
+    achievements.value = []
+    todayMinutes.value = 0
     run('DELETE FROM current_user WHERE id = 1')
   }
 
@@ -331,5 +364,6 @@ export const useUserStore = defineStore('user', () => {
     getModuleProgress,
     logout,
     saveToStorage,
+    loadUserData,
   }
 })

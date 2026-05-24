@@ -77,21 +77,32 @@ export const useLearningPathStore = defineStore('learningPath', () => {
   const overallProgress = computed(() => totalNodes.value > 0 ? completedCount.value / totalNodes.value : 0)
 
   function loadFromStorage() {
-    const rows = query<PathNodeRow>('SELECT * FROM path_nodes ORDER BY order_num')
+    if (!userStore.currentUser) {
+      pathNodes.value = []
+      return
+    }
+
+    const rows = query<PathNodeRow>(
+      'SELECT * FROM path_nodes WHERE user_id = ? ORDER BY order_num',
+      [userStore.currentUser.id]
+    )
     pathNodes.value = rows.map(rowToPathNode)
   }
 
   function initModulePath(moduleId: string, items: { id: string }[], groupInfo?: { name: string; icon: string; color: string }) {
+    if (!userStore.currentUser) return
+    const userId = userStore.currentUser.id
+
     const existing = pathNodes.value.filter(n => n.moduleId === moduleId)
     if (existing.length > 0) return
 
     const db = getDatabase()
     const stmt = db.prepare(
-      'INSERT INTO path_nodes (id, module_id, item_id, order_num, status, stars, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO path_nodes (id, user_id, module_id, item_id, order_num, status, stars, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     )
 
     const nodes: PathNode[] = items.map((item, index) => ({
-      id: `${moduleId}-${item.id}`,
+      id: `${userId}-${moduleId}-${item.id}`,
       moduleId,
       itemId: item.id,
       order: index,
@@ -100,7 +111,7 @@ export const useLearningPathStore = defineStore('learningPath', () => {
     }))
 
     for (const node of nodes) {
-      stmt.run([node.id, node.moduleId, node.itemId, node.order, node.status, node.stars, null])
+      stmt.run([node.id, userId, node.moduleId, node.itemId, node.order, node.status, node.stars, null])
     }
     stmt.free()
     schedulePersist()

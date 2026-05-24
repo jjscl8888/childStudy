@@ -2,10 +2,14 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useLearningPathStore } from '@/stores/learningPathStore'
+import { useSpacedRepetitionStore } from '@/stores/spacedRepetitionStore'
 import TopBar from '@/components/layout/TopBar.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
+const learningPathStore = useLearningPathStore()
+const spacedRepetition = useSpacedRepetitionStore()
 
 const showSwitchModal = ref(false)
 
@@ -45,6 +49,8 @@ const totalRecords = computed(() => userStore.learningRecords.length)
 
 function handleSwitchUser(userId: string) {
   userStore.switchUser(userId)
+  learningPathStore.saveToStorage()
+  spacedRepetition.saveToStorage()
   showSwitchModal.value = false
 }
 
