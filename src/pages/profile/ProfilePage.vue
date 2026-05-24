@@ -5,6 +5,7 @@ import { useUserStore } from '@/stores/userStore'
 import { useLearningPathStore } from '@/stores/learningPathStore'
 import { useSpacedRepetitionStore } from '@/stores/spacedRepetitionStore'
 import TopBar from '@/components/layout/TopBar.vue'
+import VoiceSettingsPanel from '@/components/common/VoiceSettingsPanel.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -12,6 +13,7 @@ const learningPathStore = useLearningPathStore()
 const spacedRepetition = useSpacedRepetitionStore()
 
 const showSwitchModal = ref(false)
+const showVoiceSettings = ref(false)
 
 const unlockedCount = computed(() => userStore.achievements.filter(a => a.unlocked).length)
 const totalCount = computed(() => userStore.achievements.length)
@@ -187,6 +189,13 @@ function handleLogout() {
       <div class="space-y-3 pt-2">
         <button
           class="fun-btn-secondary w-full text-lg"
+          @click="showVoiceSettings = true"
+        >
+          🎙️ 语音设置
+        </button>
+
+        <button
+          class="fun-btn-secondary w-full text-lg"
           @click="showSwitchModal = true"
         >
           🔄 切换用户
@@ -243,6 +252,8 @@ function handleLogout() {
         </div>
       </div>
     </Teleport>
+
+    <VoiceSettingsPanel v-if="showVoiceSettings" @close="showVoiceSettings = false" />
   </div>
 </template>
 

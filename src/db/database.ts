@@ -214,6 +214,17 @@ function createTables(database: Database) {
     )
   `)
 
+  database.run(`
+    CREATE TABLE IF NOT EXISTS voice_settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      user_id TEXT NOT NULL DEFAULT '',
+      rate REAL NOT NULL DEFAULT 0.7,
+      pitch REAL NOT NULL DEFAULT 1.0,
+      gender TEXT NOT NULL DEFAULT 'female',
+      tone TEXT NOT NULL DEFAULT 'gentle'
+    )
+  `)
+
   const checkStmt = database.prepare("SELECT COUNT(*) as cnt FROM admin_users")
   let adminExists = false
   if (checkStmt.step()) {

@@ -1,4 +1,5 @@
 import { ref, onUnmounted } from 'vue'
+import { useVoiceSettingsStore } from '@/stores/voiceSettingsStore'
 
 export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: number = 0.7) {
   const isSpeaking = ref(false)
@@ -44,30 +45,47 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
     })
   }
 
-  function findBestVoice(lang: string, voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  function scoreVoice(v: SpeechSynthesisVoice, lang: string, gender: string): number {
+    let score = 0
+    const name = v.name.toLowerCase()
+
+    if (v.lang === lang) {
+      score += 100
+    } else if (lang === 'zh-CN' && v.lang === 'zh') {
+      score += 95
+    } else if (v.lang.startsWith('zh') && lang.startsWith('zh')) {
+      score += 50
+    } else if (v.lang.split('-')[0] === lang.split('-')[0]) {
+      score += 30
+    }
+
+    if (v.localService) score += 20
+
+    if (gender === 'female') {
+      if (name.includes('female') || name.includes('xiaoxiao') || name.includes('xiaoyi')) score += 10
+    } else if (gender === 'male') {
+      if (name.includes('yunxi') || name.includes('kangkang')) score += 10
+      if (name.includes('male') && !name.includes('female')) score += 10
+    }
+
+    return score
+  }
+
+  function findBestVoice(lang: string, gender: string, voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
     if (voices.length === 0) return null
 
-    const langPrefix = lang.split('-')[0]
+    let best: SpeechSynthesisVoice | null = null
+    let bestScore = -1
 
-    const localExact = voices.find(v => v.lang === lang && v.localService)
-    if (localExact) return localExact
+    for (const v of voices) {
+      const s = scoreVoice(v, lang, gender)
+      if (s > bestScore) {
+        bestScore = s
+        best = v
+      }
+    }
 
-    const localPrefix = voices.find(v => v.lang.startsWith(langPrefix) && v.localService)
-    if (localPrefix) return localPrefix
-
-    const networkExact = voices.find(v => v.lang === lang && !v.localService)
-    if (networkExact) return networkExact
-
-    const networkPrefix = voices.find(v => v.lang.startsWith(langPrefix) && !v.localService)
-    if (networkPrefix) return networkPrefix
-
-    const anyExact = voices.find(v => v.lang === lang)
-    if (anyExact) return anyExact
-
-    const anyPrefix = voices.find(v => v.lang.startsWith(langPrefix))
-    if (anyPrefix) return anyPrefix
-
-    return null
+    return best
   }
 
   function findFallbackVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
@@ -84,9 +102,17 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
       speechSynthesis.resume()
     }
 
+    let voiceSettings: ReturnType<typeof useVoiceSettingsStore> | null = null
+    try {
+      voiceSettings = useVoiceSettingsStore()
+    } catch {
+      // store may not be available during SSR or before pinia init
+    }
+
     const lang = options?.lang || defaultLang
-    const rate = options?.rate ?? defaultRate
-    const pitch = options?.pitch ?? 1.0
+    const rate = options?.rate ?? voiceSettings?.rate ?? defaultRate
+    const pitch = options?.pitch ?? voiceSettings?.pitch ?? 1.0
+    const gender = voiceSettings?.gender ?? 'female'
 
     const voices = await loadVoices()
 
@@ -95,7 +121,7 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
     utterance.rate = rate
     utterance.pitch = pitch
 
-    const voice = findBestVoice(lang, voices)
+    const voice = findBestVoice(lang, gender, voices)
     if (voice) {
       utterance.voice = voice
     }
