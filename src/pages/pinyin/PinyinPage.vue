@@ -89,6 +89,16 @@ function goToDetail(itemId: string) {
   router.push(`/pinyin/${itemId}`)
 }
 
+function goToCategoryDetail(itemId: string) {
+  router.push(`/pinyin/${itemId}`)
+}
+
+function startCategoryLearning(items: typeof pinyinData) {
+  if (items.length > 0) {
+    router.push(`/pinyin/${items[0].id}`)
+  }
+}
+
 function goReview(itemId: string) {
   router.push(`/pinyin/${itemId}`)
 }
@@ -255,14 +265,23 @@ function getStatusColor(status: string) {
         </div>
 
         <div v-for="group in categoryGroups" :key="group.name" class="mb-5">
-          <div class="mb-2 flex items-center gap-2">
-            <span
-              class="inline-block rounded-full px-3 py-1 text-xs font-bold text-white"
-              :style="{ backgroundColor: categoryTabs.find(t => t.key === categoryType)?.color }"
+          <div class="mb-2 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span
+                class="inline-block rounded-full px-3 py-1 text-xs font-bold text-white"
+                :style="{ backgroundColor: categoryTabs.find(t => t.key === categoryType)?.color }"
+              >
+                {{ group.name }}
+              </span>
+              <span class="text-xs text-gray-400">{{ group.items.length }}个</span>
+            </div>
+            <button
+              class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-white transition-all active:scale-95"
+              :style="{ backgroundColor: categoryTabs.find(t => t.key === categoryType)?.color || '#FF9F43' }"
+              @click="startCategoryLearning(group.items)"
             >
-              {{ group.name }}
-            </span>
-            <span class="text-xs text-gray-400">{{ group.items.length }}个</span>
+              学习本类 →
+            </button>
           </div>
 
           <div class="grid grid-cols-4 gap-2">
@@ -271,7 +290,7 @@ function getStatusColor(status: string) {
               :key="p.id"
               class="flex flex-col items-center gap-1 rounded-2xl border-2 bg-white p-3 transition-all duration-200 active:scale-95"
               :style="{ borderColor: (categoryTabs.find(t => t.key === categoryType)?.color || '#FF9F43') + '30' }"
-              @click="goToDetail(p.id)"
+              @click="goToCategoryDetail(p.id)"
             >
               <span
                 class="text-2xl font-bold"

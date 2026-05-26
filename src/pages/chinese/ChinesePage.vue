@@ -1,23 +1,26 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { CheckCircle, Lock, Star, Play } from 'lucide-vue-next'
+import { CheckCircle, Lock, Star, Play, Volume2 } from 'lucide-vue-next'
 import TopBar from '@/components/layout/TopBar.vue'
 import ProgressBar from '@/components/common/ProgressBar.vue'
 import { chineseData } from '@/data/chineseData'
 import { useUserStore } from '@/stores/userStore'
 import { useLearningPathStore } from '@/stores/learningPathStore'
 import { useSpacedRepetitionStore } from '@/stores/spacedRepetitionStore'
+import { useTextToSpeech } from '@/composables/useTextToSpeech'
 
 const router = useRouter()
 const userStore = useUserStore()
 const learningPathStore = useLearningPathStore()
 const spacedRepetition = useSpacedRepetitionStore()
+const tts = useTextToSpeech('zh-CN', 0.6)
 
-const activeTab = ref<'path' | 'review'>('path')
+const activeTab = ref<'path' | 'review' | 'category'>('path')
 
 const tabs = [
   { key: 'path' as const, label: '学习路径', icon: '🗺️' },
+  { key: 'category' as const, label: '分类浏览', icon: '📂' },
   { key: 'review' as const, label: '复习巩固', icon: '🔄' },
 ]
 
@@ -47,6 +50,45 @@ const groupedNodes = computed(() => {
   return groups
 })
 
+const categoryGroups = computed(() => {
+  const groups: Record<string, typeof chineseData> = {}
+  for (const char of chineseData) {
+    const name = char.groupName
+    if (!groups[name]) {
+      groups[name] = []
+    }
+    groups[name].push(char)
+  }
+  return groups
+})
+
+const groupEmojis: Record<string, string> = {
+  '数字': '🔢',
+  '自然': '🌿',
+  '人物身体': '🧍',
+  '动物': '🐾',
+  '方位': '🧭',
+  '天地': '🌤️',
+  '家庭': '👨‍👩‍👧',
+  '学校': '🏫',
+  '生活': '🏠',
+  '植物': '🌻',
+  '常用动词': '🏃',
+  '常用形容词': '🎨',
+  '食物饮品': '🍽️',
+  '身体扩展': '🦴',
+  '交通工具': '🚗',
+  '时间': '⏰',
+  '更多动物': '🦁',
+  '学校用品': '✏️',
+  '常用虚词': '📝',
+  '天气扩展': '🌦️',
+  '衣物': '👕',
+  '建筑场所': '🏠',
+  '动作扩展': '🤲',
+  '称谓': '👨‍👩‍👧‍👦',
+}
+
 const reviewItems = computed(() => {
   return spacedRepetition.getModuleReviews('chinese')
     .filter(item => item.lastReview !== null)
@@ -67,6 +109,21 @@ const overdueCount = computed(() => reviewItems.value.filter(r => r.isDue).lengt
 function goToDetail(itemId: string) {
   if (!learningPathStore.isNodeAccessible('chinese', itemId)) return
   router.push(`/chinese/${itemId}`)
+}
+
+function goToCategoryDetail(itemId: string) {
+  router.push(`/chinese/${itemId}`)
+}
+
+function speakChar(character: string, event?: Event) {
+  event?.stopPropagation()
+  tts.speak(character, { lang: 'zh-CN', rate: 0.6 })
+}
+
+function startCategoryLearning(chars: typeof chineseData) {
+  if (chars.length > 0) {
+    router.push(`/chinese/${chars[0].id}`)
+  }
 }
 
 function goReview(itemId: string) {
@@ -199,6 +256,48 @@ function getStatusColor(status: string) {
               class="ml-6 h-3 w-0.5"
               :style="{ backgroundColor: node.status === 'completed' ? '#2ED573' : '#E5E7EB' }"
             />
+          </div>
+        </div>
+      </div>
+
+      <div v-else-if="activeTab === 'category'">
+        <div
+          v-for="(chars, groupName) in categoryGroups"
+          :key="groupName"
+          class="mb-5"
+        >
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <span class="text-lg">{{ groupEmojis[groupName] || '📂' }}</span>
+              <h3 class="text-base font-bold text-gray-700">{{ groupName }}</h3>
+              <span class="text-xs text-gray-400 ml-1">{{ chars.length }}字</span>
+            </div>
+            <button
+              class="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold text-white transition-all active:scale-95"
+              style="background-color: #2ED573"
+              @click="startCategoryLearning(chars)"
+            >
+              学习本类 →
+            </button>
+          </div>
+          <div class="grid grid-cols-4 gap-2">
+            <button
+              v-for="char in chars"
+              :key="char.id"
+              class="flex flex-col items-center justify-center rounded-2xl border-2 bg-white p-2.5 transition-all active:scale-[0.95]"
+              style="border-color: #2ED57330"
+              @click="goToCategoryDetail(char.id)"
+            >
+              <span class="text-2xl font-bold" style="color: #2ED573">{{ char.character }}</span>
+              <div class="flex items-center gap-0.5 mt-1">
+                <span class="text-xs text-gray-500">{{ char.pinyin }}</span>
+                <Volume2
+                  class="h-3 w-3 cursor-pointer transition-colors"
+                  style="color: #2ED573"
+                  @click="speakChar(char.character, $event)"
+                />
+              </div>
+            </button>
           </div>
         </div>
       </div>
