@@ -285,10 +285,12 @@ function getStatusColor(status: string) {
           </div>
 
           <div class="grid grid-cols-4 gap-2">
-            <button
+            <div
               v-for="p in group.items"
               :key="p.id"
-              class="flex flex-col items-center gap-1 rounded-2xl border-2 bg-white p-3 transition-all duration-200 active:scale-95"
+              role="button"
+              tabindex="0"
+              class="flex flex-col items-center gap-1 rounded-2xl border-2 bg-white p-3 transition-all duration-200 active:scale-95 cursor-pointer"
               :style="{ borderColor: (categoryTabs.find(t => t.key === categoryType)?.color || '#FF9F43') + '30' }"
               @click="goToCategoryDetail(p.id)"
             >
@@ -311,7 +313,7 @@ function getStatusColor(status: string) {
               >
                 <Volume2 class="h-3.5 w-3.5" />
               </button>
-            </button>
+            </div>
           </div>
         </div>
       </div>

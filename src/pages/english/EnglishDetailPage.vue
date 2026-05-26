@@ -11,6 +11,7 @@ import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import SessionProgress from '@/components/learning/SessionProgress.vue'
 import LetterByLetterWriter from '@/components/learning/LetterByLetterWriter.vue'
 import CompanionGuide from '@/components/learning/CompanionGuide.vue'
+import EnglishMiniGame from '@/components/learning/EnglishMiniGame.vue'
 import RewardAnimation from '@/components/common/RewardAnimation.vue'
 
 const route = useRoute()
@@ -25,7 +26,7 @@ const word = computed(() => englishData.find(w => w.id === id.value))
 const { isListening, transcript, error: speechError, isSupported, lastAudioUrl, isPlaying: isPlayingRecording, start: startListening, stop: stopListening, playLastRecording, calculateScore } = useSpeechRecognition({ lang: 'en-US', maxDuration: 8000 })
 const tts = useTextToSpeech('en-US', 0.7)
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = 6
 const currentStep = ref(0)
 const showReward = ref(false)
 const sessionCompleted = ref(false)
@@ -45,6 +46,7 @@ const sessionSteps = [
   { label: '听音认字', icon: '🎵' },
   { label: '跟读练习', icon: '🎤' },
   { label: '书写练习', icon: '✍️' },
+  { label: '趣味互动', icon: '🎮' },
   { label: '巩固游戏', icon: '🎯' },
   { label: '复习挑战', icon: '🏆' },
 ]
@@ -73,6 +75,8 @@ const meaningQuizOptions = computed(() => {
 
 const writingCompleted = ref(false)
 const writingAccuracy = ref(0)
+const miniGameCompleted = ref(false)
+const miniGameScore = ref(0)
 
 function setCompanion(msg: string, emotion: 'happy' | 'encourage' | 'think' | 'celebrate' = 'happy') {
   companionMsg.value = msg
@@ -137,30 +141,43 @@ function onWritingComplete(accuracy: number) {
   }
 }
 
+function onMiniGameComplete(gameScore: number, stars: number) {
+  miniGameCompleted.value = true
+  miniGameScore.value = gameScore
+  stepResults.value.push({ step: 3, score: gameScore, stars })
+  if (gameScore >= 80) {
+    setCompanion('游戏高手！你真的记住了！🎮✨', 'celebrate')
+  } else if (gameScore >= 50) {
+    setCompanion('小游戏玩得不错！印象更深了吧！', 'happy')
+  } else {
+    setCompanion('继续加油！多玩几次会更熟练的！', 'encourage')
+  }
+}
+
 function selectOption(option: string) {
   if (revealed.value) return
   selectedOption.value = option
   revealed.value = true
   const isCorrect = option === word.value?.word
   if (isCorrect) {
-    stepResults.value.push({ step: 3, score: 100, stars: 3 })
+    stepResults.value.push({ step: 4, score: 100, stars: 3 })
     setCompanion('答对了！你真棒！🎉', 'celebrate')
   } else {
-    stepResults.value.push({ step: 3, score: 0, stars: 1 })
+    stepResults.value.push({ step: 4, score: 0, stars: 1 })
     setCompanion(`正确答案是 "${word.value?.word}"，记住啦！`, 'encourage')
   }
 }
 
 function selectMeaningOption(option: string) {
-  if (revealed.value && currentStep.value === 4) return
+  if (revealed.value && currentStep.value === 5) return
   selectedOption.value = option
   revealed.value = true
   const isCorrect = option === word.value?.chinese
   if (isCorrect) {
-    stepResults.value.push({ step: 4, score: 100, stars: 3 })
+    stepResults.value.push({ step: 5, score: 100, stars: 3 })
     setCompanion('完美！你已经完全掌握了！🏆', 'celebrate')
   } else {
-    stepResults.value.push({ step: 4, score: 0, stars: 1 })
+    stepResults.value.push({ step: 5, score: 0, stars: 1 })
     setCompanion(`正确意思是"${word.value?.chinese}"，再看看吧！`, 'encourage')
   }
 }
@@ -196,9 +213,12 @@ function speakStepIntro(step: number) {
       speakIntro(`动手拼一拼${word.value.word}，在格子里写三次哦。`, 'zh-CN')
       break
     case 3:
-      speakIntro(`来玩个小游戏。找出${word.value.chinese}的英文是哪个。`, 'zh-CN')
+      speakIntro(`来玩个小游戏吧！加深对${word.value.word}的印象。`, 'zh-CN')
       break
     case 4:
+      speakIntro(`来玩个小游戏。找出${word.value.chinese}的英文是哪个。`, 'zh-CN')
+      break
+    case 5:
       speakIntro(`最后一关！看看你是不是真的掌握了${word.value.word}。`, 'zh-CN')
       break
   }
@@ -217,8 +237,10 @@ function nextStep() {
     } else if (currentStep.value === 2) {
       setCompanion('动手拼一拼，记得更牢哦！✍️', 'think')
     } else if (currentStep.value === 3) {
-      setCompanion('来玩个小游戏巩固一下吧！🎯', 'happy')
+      setCompanion('来玩个小游戏加深印象吧！🎮', 'happy')
     } else if (currentStep.value === 4) {
+      setCompanion('来玩个小游戏巩固一下吧！🎯', 'happy')
+    } else if (currentStep.value === 5) {
       setCompanion('最后一关！看看你是不是真的学会了！🏆', 'encourage')
     }
 
@@ -276,6 +298,8 @@ function resetSession() {
   readTranscript.value = ''
   writingCompleted.value = false
   writingAccuracy.value = 0
+  miniGameCompleted.value = false
+  miniGameScore.value = 0
   selectedOption.value = null
   revealed.value = false
   stepResults.value = []
@@ -512,6 +536,25 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="currentStep === 3" key="step3" class="flex flex-col items-center gap-5">
+          <div class="fun-card w-full py-6 px-4">
+            <EnglishMiniGame
+              :word="word"
+              color="#54A0FF"
+              @complete="onMiniGameComplete"
+            />
+          </div>
+
+          <button
+            v-if="miniGameCompleted"
+            class="w-full rounded-2xl py-3 text-lg font-bold text-white shadow-md transition-all active:scale-[0.97]"
+            style="background-color: #54A0FF"
+            @click="nextStep"
+          >
+            去挑战 →
+          </button>
+        </div>
+
+        <div v-else-if="currentStep === 4" key="step4" class="flex flex-col items-center gap-5">
           <div class="fun-card flex flex-col items-center gap-5 py-8 w-full">
             <h3 class="text-xl font-bold text-gray-600">巩固游戏 🎯</h3>
 
@@ -566,7 +609,7 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <div v-else-if="currentStep === 4" key="step4" class="flex flex-col items-center gap-5">
+        <div v-else-if="currentStep === 5" key="step5" class="flex flex-col items-center gap-5">
           <div class="fun-card flex flex-col items-center gap-5 py-8 w-full">
             <h3 class="text-xl font-bold text-gray-600">复习挑战 🏆</h3>
 
@@ -642,7 +685,7 @@ onUnmounted(() => {
           </p>
         </div>
 
-        <div class="grid grid-cols-5 gap-1 mb-6">
+        <div class="grid grid-cols-6 gap-1 mb-6">
           <div
             v-for="(step, idx) in sessionSteps"
             :key="idx"

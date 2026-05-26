@@ -1,5 +1,19 @@
 import { ref, onUnmounted } from 'vue'
-import { useVoiceSettingsStore } from '@/stores/voiceSettingsStore'
+import { useVoiceSettingsStore, BAIDU_ROLE_MAP, type VoiceRole } from '@/stores/voiceSettingsStore'
+
+function rateToBaiduSpd(rate: number): number {
+  return Math.min(15, Math.max(0, Math.round(rate * 5)))
+}
+
+function pitchToBaiduPit(pitch: number): number {
+  return Math.min(15, Math.max(0, Math.round(pitch * 5)))
+}
+
+function langToBaiduLan(lang: string): string {
+  if (lang.startsWith('zh')) return 'zh'
+  if (lang.startsWith('en')) return 'en'
+  return 'zh'
+}
 
 export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: number = 0.7) {
   const isSpeaking = ref(false)
@@ -7,6 +21,7 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
   const voicesReady = ref(false)
   let retryCount = 0
   const MAX_RETRIES = 2
+  let baiduAudio: HTMLAudioElement | null = null
 
   function getVoices(): SpeechSynthesisVoice[] {
     return typeof window !== 'undefined' ? speechSynthesis.getVoices() : []
@@ -93,11 +108,19 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
     return voices.find(v => v.localService) || voices[0] || null
   }
 
-  async function speak(text: string, options?: { lang?: string; rate?: number; pitch?: number }) {
+  function stopBaiduAudio() {
+    if (baiduAudio) {
+      baiduAudio.pause()
+      baiduAudio.removeAttribute('src')
+      baiduAudio.load()
+      baiduAudio = null
+    }
+  }
+
+  async function speakWithBrowser(text: string, options?: { lang?: string; rate?: number; pitch?: number }) {
     if (!text || typeof window === 'undefined') return
 
     speechSynthesis.cancel()
-
     if (speechSynthesis.paused) {
       speechSynthesis.resume()
     }
@@ -162,11 +185,88 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
     speechSynthesis.speak(utterance)
   }
 
+  async function speakWithBaidu(text: string, options?: { lang?: string; rate?: number; pitch?: number }) {
+    if (!text || typeof window === 'undefined') return
+
+    stopBaiduAudio()
+    speechSynthesis.cancel()
+
+    let voiceSettings: ReturnType<typeof useVoiceSettingsStore> | null = null
+    try {
+      voiceSettings = useVoiceSettingsStore()
+    } catch {
+      // store may not be available
+    }
+
+    const lang = options?.lang || defaultLang
+    const rate = options?.rate ?? voiceSettings?.rate ?? defaultRate
+    const pitch = options?.pitch ?? voiceSettings?.pitch ?? 1.0
+    const role = voiceSettings?.role ?? 'adult_female'
+    const roleInfo = BAIDU_ROLE_MAP[role as VoiceRole] || BAIDU_ROLE_MAP.adult_female
+
+    const truncatedText = text.length > 300 ? text.slice(0, 300) : text
+
+    const params = new URLSearchParams({
+      lan: langToBaiduLan(lang),
+      ie: 'UTF-8',
+      spd: String(rateToBaiduSpd(rate)),
+      pit: String(pitchToBaiduPit(pitch)),
+      vol: '5',
+      per: String(roleInfo.per),
+      text: truncatedText,
+    })
+
+    const audio = new Audio(`https://tts.baidu.com/text2audio?${params.toString()}`)
+    baiduAudio = audio
+
+    return new Promise<void>((resolve) => {
+      audio.onplay = () => {
+        isSpeaking.value = true
+      }
+      audio.onended = () => {
+        isSpeaking.value = false
+        baiduAudio = null
+        resolve()
+      }
+      audio.onerror = () => {
+        isSpeaking.value = false
+        baiduAudio = null
+        speakWithBrowser(text, options).then(resolve)
+      }
+
+      audio.play().catch(() => {
+        isSpeaking.value = false
+        baiduAudio = null
+        speakWithBrowser(text, options).then(resolve)
+      })
+    })
+  }
+
+  async function speak(text: string, options?: { lang?: string; rate?: number; pitch?: number }) {
+    if (!text || typeof window === 'undefined') return
+
+    let voiceSettings: ReturnType<typeof useVoiceSettingsStore> | null = null
+    try {
+      voiceSettings = useVoiceSettingsStore()
+    } catch {
+      // store may not be available
+    }
+
+    const engine = voiceSettings?.engine ?? 'browser'
+
+    if (engine === 'baidu') {
+      return speakWithBaidu(text, options)
+    } else {
+      return speakWithBrowser(text, options)
+    }
+  }
+
   function stop() {
     speechSynthesis.cancel()
     if (speechSynthesis.paused) {
       speechSynthesis.resume()
     }
+    stopBaiduAudio()
     isSpeaking.value = false
     currentUtterance.value = null
   }

@@ -86,6 +86,27 @@ function migrateAddUserId(database: Database) {
   }
 }
 
+function migrateVoiceSettings(database: Database) {
+  try {
+    const info = database.prepare('PRAGMA table_info(voice_settings)')
+    const columns: string[] = []
+    while (info.step()) {
+      const row = info.getAsObject() as { name: string }
+      columns.push(row.name)
+    }
+    info.free()
+
+    if (!columns.includes('engine')) {
+      database.run("ALTER TABLE voice_settings ADD COLUMN engine TEXT NOT NULL DEFAULT 'browser'")
+    }
+    if (!columns.includes('role')) {
+      database.run("ALTER TABLE voice_settings ADD COLUMN role TEXT NOT NULL DEFAULT 'adult_female'")
+    }
+  } catch {
+    // table may not exist yet
+  }
+}
+
 function createTables(database: Database) {
   database.run(`
     CREATE TABLE IF NOT EXISTS users (
@@ -245,6 +266,7 @@ function createTables(database: Database) {
   }
 
   migrateAddUserId(database)
+  migrateVoiceSettings(database)
 }
 
 export async function initDatabase(): Promise<Database> {

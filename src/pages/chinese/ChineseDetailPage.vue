@@ -10,6 +10,7 @@ import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import SessionProgress from '@/components/learning/SessionProgress.vue'
 import HanziStrokeWriter from '@/components/learning/HanziStrokeWriter.vue'
 import CompanionGuide from '@/components/learning/CompanionGuide.vue'
+import CharacterMiniGame from '@/components/learning/CharacterMiniGame.vue'
 import RewardAnimation from '@/components/common/RewardAnimation.vue'
 
 const route = useRoute()
@@ -22,7 +23,7 @@ const tts = useTextToSpeech('zh-CN', 0.6)
 const id = computed(() => route.params.id as string)
 const character = computed(() => chineseData.find(c => c.id === id.value))
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = 6
 const currentStep = ref(0)
 const showReward = ref(false)
 const sessionCompleted = ref(false)
@@ -31,6 +32,8 @@ const companionEmotion = ref<'happy' | 'encourage' | 'think' | 'celebrate'>('hap
 
 const writingCompleted = ref(false)
 const writingAccuracy = ref(0)
+const miniGameCompleted = ref(false)
+const miniGameScore = ref(0)
 const selectedOption = ref<string | null>(null)
 const revealed = ref(false)
 const correctAnswers = ref(0)
@@ -41,6 +44,7 @@ const sessionSteps = [
   { label: '字源故事', icon: '📜' },
   { label: '书写练习', icon: '✍️' },
   { label: '组词造句', icon: '💬' },
+  { label: '趣味互动', icon: '🎮' },
   { label: '巩固挑战', icon: '🏆' },
 ]
 
@@ -93,6 +97,19 @@ function onWritingComplete(accuracy: number) {
   }
 }
 
+function onMiniGameComplete(gameScore: number, stars: number) {
+  miniGameCompleted.value = true
+  miniGameScore.value = gameScore
+  stepResults.value.push({ step: 4, score: gameScore, stars })
+  if (gameScore >= 80) {
+    setCompanion('游戏高手！你真的记住这个字了！🎮✨', 'celebrate')
+  } else if (gameScore >= 50) {
+    setCompanion('小游戏玩得不错！印象更深了吧！', 'happy')
+  } else {
+    setCompanion('继续加油！多玩几次会更熟练的！', 'encourage')
+  }
+}
+
 function selectOption(option: string) {
   if (revealed.value) return
   selectedOption.value = option
@@ -100,10 +117,10 @@ function selectOption(option: string) {
   const isCorrect = option === character.value?.character
   if (isCorrect) {
     correctAnswers.value++
-    stepResults.value.push({ step: 4, score: 100, stars: 3 })
+    stepResults.value.push({ step: 5, score: 100, stars: 3 })
     setCompanion('答对了！你已经认识这个字了！🎉', 'celebrate')
   } else {
-    stepResults.value.push({ step: 4, score: 0, stars: 1 })
+    stepResults.value.push({ step: 5, score: 0, stars: 1 })
     setCompanion(`正确答案是"${character.value?.character}"，记住啦！`, 'encourage')
   }
 }
@@ -157,6 +174,9 @@ function speakStepIntro(step: number) {
       speakIntro(`来学学${character.value.character}字怎么组词造句吧。`)
       break
     case 4:
+      speakIntro(`来玩个小游戏吧！加深对${character.value.character}字的印象。`)
+      break
+    case 5:
       speakIntro(`最后一关！看看你是不是真的学会了${character.value.character}字。`)
       break
   }
@@ -177,6 +197,8 @@ function nextStep() {
     } else if (currentStep.value === 3) {
       setCompanion('来学学这个字怎么组词吧！💬', 'happy')
     } else if (currentStep.value === 4) {
+      setCompanion('来玩个小游戏加深印象吧！🎮', 'happy')
+    } else if (currentStep.value === 5) {
       setCompanion('最后一关！看看你是不是真的学会了！🏆', 'encourage')
     }
 
@@ -258,6 +280,8 @@ function resetSession() {
   companionMsg.value = ''
   writingCompleted.value = false
   writingAccuracy.value = 0
+  miniGameCompleted.value = false
+  miniGameScore.value = 0
   selectedOption.value = null
   revealed.value = false
   correctAnswers.value = 0
@@ -526,11 +550,29 @@ onUnmounted(() => {
             class="fun-btn-success w-full text-lg"
             @click="nextStep"
           >
-            下一关 →
+            去玩游戏 →
           </button>
         </div>
 
         <div v-else-if="currentStep === 4" key="step4" class="flex flex-col items-center gap-5">
+          <div class="fun-card w-full py-6 px-4">
+            <CharacterMiniGame
+              :character="character"
+              color="#2ED573"
+              @complete="onMiniGameComplete"
+            />
+          </div>
+
+          <button
+            v-if="miniGameCompleted"
+            class="fun-btn-success w-full text-lg"
+            @click="nextStep"
+          >
+            去挑战 →
+          </button>
+        </div>
+
+        <div v-else-if="currentStep === 5" key="step5" class="flex flex-col items-center gap-5">
           <div class="fun-card flex flex-col items-center gap-5 py-8 w-full">
             <h3 class="text-xl font-bold text-gray-600">巩固挑战 🏆</h3>
 
@@ -629,7 +671,7 @@ onUnmounted(() => {
           </p>
         </div>
 
-        <div class="grid grid-cols-5 gap-1 mb-6">
+        <div class="grid grid-cols-6 gap-1 mb-6">
           <div
             v-for="(step, idx) in sessionSteps"
             :key="idx"

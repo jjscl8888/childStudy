@@ -11,6 +11,7 @@ import { useTextToSpeech } from '@/composables/useTextToSpeech'
 import SessionProgress from '@/components/learning/SessionProgress.vue'
 import LetterByLetterWriter from '@/components/learning/LetterByLetterWriter.vue'
 import CompanionGuide from '@/components/learning/CompanionGuide.vue'
+import PinyinMiniGame from '@/components/learning/PinyinMiniGame.vue'
 import RewardAnimation from '@/components/common/RewardAnimation.vue'
 
 const route = useRoute()
@@ -25,7 +26,7 @@ const item = computed(() => pinyinData.find(p => p.id === id.value))
 const { isListening, transcript: speechTranscript, error: speechError, isSupported: speechSupported, lastAudioUrl, isPlaying: isPlayingRecording, start: startListening, stop: stopListening, playLastRecording, calculateScore } = useSpeechRecognition({ lang: 'zh-CN', maxDuration: 8000 })
 const tts = useTextToSpeech('zh-CN', 0.6)
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = 6
 const currentStep = ref(0)
 const showReward = ref(false)
 const sessionCompleted = ref(false)
@@ -39,6 +40,8 @@ const hasScored = ref(false)
 const readTranscript = ref('')
 const writingCompleted = ref(false)
 const writingAccuracy = ref(0)
+const miniGameCompleted = ref(false)
+const miniGameScore = ref(0)
 
 const selectedOption = ref<string | null>(null)
 const revealed = ref(false)
@@ -50,6 +53,7 @@ const sessionSteps = [
   { label: '听音认形', icon: '🎵' },
   { label: '跟读练习', icon: '🎤' },
   { label: '书写练习', icon: '✍️' },
+  { label: '趣味互动', icon: '🎮' },
   { label: '巩固游戏', icon: '🎯' },
   { label: '复习挑战', icon: '🏆' },
 ]
@@ -137,6 +141,19 @@ function onWritingComplete(accuracy: number) {
   }
 }
 
+function onMiniGameComplete(gameScore: number, stars: number) {
+  miniGameCompleted.value = true
+  miniGameScore.value = gameScore
+  stepResults.value.push({ step: 3, score: gameScore, stars })
+  if (gameScore >= 80) {
+    setCompanion('游戏高手！你真的记住了！🎮✨', 'celebrate')
+  } else if (gameScore >= 50) {
+    setCompanion('小游戏玩得不错！印象更深了吧！', 'happy')
+  } else {
+    setCompanion('继续加油！多玩几次会更熟练的！', 'encourage')
+  }
+}
+
 function selectOption(option: string) {
   if (revealed.value) return
   selectedOption.value = option
@@ -144,25 +161,25 @@ function selectOption(option: string) {
   const isCorrect = option === item.value?.pinyin
   if (isCorrect) {
     correctAnswers.value++
-    stepResults.value.push({ step: 3, score: 100, stars: 3 })
+    stepResults.value.push({ step: 4, score: 100, stars: 3 })
     setCompanion('答对了！你真棒！🎉', 'celebrate')
   } else {
-    stepResults.value.push({ step: 3, score: 0, stars: 1 })
+    stepResults.value.push({ step: 4, score: 0, stars: 1 })
     setCompanion('没关系，正确答案在这里！仔细记住哦~', 'encourage')
   }
 }
 
 function selectReviewOption(option: string) {
-  if (revealed.value && currentStep.value === 4) return
+  if (revealed.value && currentStep.value === 5) return
   selectedOption.value = option
   revealed.value = true
   const isCorrect = option === item.value?.example
   if (isCorrect) {
     correctAnswers.value++
-    stepResults.value.push({ step: 4, score: 100, stars: 3 })
+    stepResults.value.push({ step: 5, score: 100, stars: 3 })
     setCompanion('完美！你已经完全掌握了！🏆', 'celebrate')
   } else {
-    stepResults.value.push({ step: 4, score: 0, stars: 1 })
+    stepResults.value.push({ step: 5, score: 0, stars: 1 })
     setCompanion('别着急，我们再复习一下！', 'encourage')
   }
 }
@@ -180,8 +197,10 @@ function nextStep() {
     } else if (currentStep.value === 2) {
       setCompanion('动手写一写，记得更牢哦！✍️', 'think')
     } else if (currentStep.value === 3) {
-      setCompanion('来玩个小游戏巩固一下吧！🎯', 'happy')
+      setCompanion('来玩个小游戏加深印象吧！🎮', 'happy')
     } else if (currentStep.value === 4) {
+      setCompanion('来玩个小游戏巩固一下吧！🎯', 'happy')
+    } else if (currentStep.value === 5) {
       setCompanion('最后一关！复习挑战等你来！🏆', 'encourage')
     }
 
@@ -268,6 +287,8 @@ function resetSession() {
   readTranscript.value = ''
   writingCompleted.value = false
   writingAccuracy.value = 0
+  miniGameCompleted.value = false
+  miniGameScore.value = 0
   selectedOption.value = null
   revealed.value = false
   correctAnswers.value = 0
@@ -305,9 +326,12 @@ function speakStepIntro(step: number) {
       speakIntro(`动手写一写${item.value.pinyin}，记得更牢哦。在格子里写三次。`)
       break
     case 3:
-      speakIntro(`来玩个小游戏。找出哪个是${item.value.pinyin}。`)
+      speakIntro(`来玩个小游戏吧！加深对${item.value.pinyin}的印象。`)
       break
     case 4:
+      speakIntro(`来玩个小游戏。找出哪个是${item.value.pinyin}。`)
+      break
+    case 5:
       speakIntro(`最后一关复习挑战！${item.value.pinyin}对应哪个词呢？`)
       break
   }
@@ -506,6 +530,24 @@ onUnmounted(() => {
         </div>
 
         <div v-else-if="currentStep === 3" key="step3" class="flex flex-col items-center gap-5">
+          <div class="fun-card w-full py-6 px-4">
+            <PinyinMiniGame
+              :item="item"
+              color="#FF9F43"
+              @complete="onMiniGameComplete"
+            />
+          </div>
+
+          <button
+            v-if="miniGameCompleted"
+            class="fun-btn-primary w-full text-lg"
+            @click="nextStep"
+          >
+            去挑战 →
+          </button>
+        </div>
+
+        <div v-else-if="currentStep === 4" key="step4" class="flex flex-col items-center gap-5">
           <div class="fun-card flex flex-col items-center gap-5 py-8 w-full">
             <h3 class="text-xl font-bold text-gray-600">巩固游戏 🎯</h3>
 
@@ -561,7 +603,7 @@ onUnmounted(() => {
           </button>
         </div>
 
-        <div v-else-if="currentStep === 4" key="step4" class="flex flex-col items-center gap-5">
+        <div v-else-if="currentStep === 5" key="step5" class="flex flex-col items-center gap-5">
           <div class="fun-card flex flex-col items-center gap-5 py-8 w-full">
             <h3 class="text-xl font-bold text-gray-600">复习挑战 🏆</h3>
 
@@ -642,7 +684,7 @@ onUnmounted(() => {
           </p>
         </div>
 
-        <div class="grid grid-cols-5 gap-1 mb-6">
+        <div class="grid grid-cols-6 gap-1 mb-6">
           <div
             v-for="(step, idx) in sessionSteps"
             :key="idx"
