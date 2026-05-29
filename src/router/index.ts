@@ -80,6 +80,11 @@ const router = createRouter({
       component: () => import('@/pages/games/MathRacePage.vue'),
     },
     {
+      path: '/speech',
+      name: 'speech',
+      component: () => import('@/pages/speech/SpeechAssessmentPage.vue'),
+    },
+    {
       path: '/profile',
       name: 'profile',
       component: () => import('@/pages/profile/ProfilePage.vue'),

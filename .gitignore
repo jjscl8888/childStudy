@@ -74,3 +74,6 @@ document/skill
 
 # Standalone projects with own git
 project/llm_proxy/
+
+# Server uploads
+uploads/

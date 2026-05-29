@@ -1,27 +1,27 @@
 import { ref, onUnmounted } from 'vue'
-import { useVoiceSettingsStore, BAIDU_ROLE_MAP, type VoiceRole } from '@/stores/voiceSettingsStore'
+import { useVoiceSettingsStore, ONLINE_ROLE_MAP, type VoiceRole } from '@/stores/voiceSettingsStore'
+import { Communicate } from '@twn39/edgetts-js'
 
-function rateToBaiduSpd(rate: number): number {
-  return Math.min(15, Math.max(0, Math.round(rate * 5)))
+function rateToEdgeRate(rate: number): string {
+  const percent = Math.round((rate - 0.8) / 0.8 * 100)
+  return `${percent >= 0 ? '+' : ''}${percent}%`
 }
 
-function pitchToBaiduPit(pitch: number): number {
-  return Math.min(15, Math.max(0, Math.round(pitch * 5)))
-}
-
-function langToBaiduLan(lang: string): string {
-  if (lang.startsWith('zh')) return 'zh'
-  if (lang.startsWith('en')) return 'en'
-  return 'zh'
+function pitchToEdgePitch(pitch: number): string {
+  const hz = Math.round((pitch - 1.0) * 50)
+  return `${hz >= 0 ? '+' : ''}${hz}Hz`
 }
 
 export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: number = 0.7) {
   const isSpeaking = ref(false)
+  const isLoading = ref(false)
+  const engineError = ref('')
   const currentUtterance = ref<SpeechSynthesisUtterance | null>(null)
   const voicesReady = ref(false)
   let retryCount = 0
   const MAX_RETRIES = 2
-  let baiduAudio: HTMLAudioElement | null = null
+  let onlineAudio: HTMLAudioElement | null = null
+  let onlineObjectUrl: string | null = null
 
   function getVoices(): SpeechSynthesisVoice[] {
     return typeof window !== 'undefined' ? speechSynthesis.getVoices() : []
@@ -108,12 +108,18 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
     return voices.find(v => v.localService) || voices[0] || null
   }
 
-  function stopBaiduAudio() {
-    if (baiduAudio) {
-      baiduAudio.pause()
-      baiduAudio.removeAttribute('src')
-      baiduAudio.load()
-      baiduAudio = null
+  function cleanupOnline() {
+    if (onlineAudio) {
+      onlineAudio.pause()
+      onlineAudio.oncanplaythrough = null
+      onlineAudio.onended = null
+      onlineAudio.onerror = null
+      onlineAudio.src = ''
+      onlineAudio = null
+    }
+    if (onlineObjectUrl) {
+      URL.revokeObjectURL(onlineObjectUrl)
+      onlineObjectUrl = null
     }
   }
 
@@ -129,7 +135,7 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
     try {
       voiceSettings = useVoiceSettingsStore()
     } catch {
-      // store may not be available during SSR or before pinia init
+      // store may not be available
     }
 
     const lang = options?.lang || defaultLang
@@ -185,11 +191,12 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
     speechSynthesis.speak(utterance)
   }
 
-  async function speakWithBaidu(text: string, options?: { lang?: string; rate?: number; pitch?: number }) {
+  async function speakWithOnline(text: string, options?: { lang?: string; rate?: number; pitch?: number }): Promise<void> {
     if (!text || typeof window === 'undefined') return
 
-    stopBaiduAudio()
+    cleanupOnline()
     speechSynthesis.cancel()
+    engineError.value = ''
 
     let voiceSettings: ReturnType<typeof useVoiceSettingsStore> | null = null
     try {
@@ -198,48 +205,170 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
       // store may not be available
     }
 
-    const lang = options?.lang || defaultLang
     const rate = options?.rate ?? voiceSettings?.rate ?? defaultRate
     const pitch = options?.pitch ?? voiceSettings?.pitch ?? 1.0
     const role = voiceSettings?.role ?? 'adult_female'
-    const roleInfo = BAIDU_ROLE_MAP[role as VoiceRole] || BAIDU_ROLE_MAP.adult_female
+    const roleInfo = ONLINE_ROLE_MAP[role as VoiceRole] || ONLINE_ROLE_MAP.adult_female
 
-    const truncatedText = text.length > 300 ? text.slice(0, 300) : text
+    const truncatedText = text.length > 500 ? text.slice(0, 500) : text
 
-    const params = new URLSearchParams({
-      lan: langToBaiduLan(lang),
-      ie: 'UTF-8',
-      spd: String(rateToBaiduSpd(rate)),
-      pit: String(pitchToBaiduPit(pitch)),
-      vol: '5',
-      per: String(roleInfo.per),
-      text: truncatedText,
-    })
+    isLoading.value = true
 
-    const audio = new Audio(`https://tts.baidu.com/text2audio?${params.toString()}`)
-    baiduAudio = audio
-
-    return new Promise<void>((resolve) => {
-      audio.onplay = () => {
-        isSpeaking.value = true
-      }
-      audio.onended = () => {
-        isSpeaking.value = false
-        baiduAudio = null
-        resolve()
-      }
-      audio.onerror = () => {
-        isSpeaking.value = false
-        baiduAudio = null
-        speakWithBrowser(text, options).then(resolve)
-      }
-
-      audio.play().catch(() => {
-        isSpeaking.value = false
-        baiduAudio = null
-        speakWithBrowser(text, options).then(resolve)
+    try {
+      const communicate = new Communicate(truncatedText, {
+        voice: roleInfo.voice,
+        rate: rateToEdgeRate(rate),
+        pitch: pitchToEdgePitch(pitch),
       })
-    })
+
+      const audioChunks: Uint8Array[] = []
+
+      for await (const chunk of communicate.stream()) {
+        if (chunk.type === 'audio') {
+          audioChunks.push(chunk.data)
+        }
+      }
+
+      if (audioChunks.length === 0) {
+        throw new Error('No audio received')
+      }
+
+      const totalLength = audioChunks.reduce((acc, chunk) => acc + chunk.length, 0)
+      const combined = new Uint8Array(totalLength)
+      let offset = 0
+      for (const chunk of audioChunks) {
+        combined.set(chunk, offset)
+        offset += chunk.length
+      }
+
+      const blob = new Blob([combined], { type: 'audio/mpeg' })
+      const objectUrl = URL.createObjectURL(blob)
+      onlineObjectUrl = objectUrl
+
+      isLoading.value = false
+
+      await new Promise<void>((resolve, reject) => {
+        const audio = new Audio(objectUrl)
+        onlineAudio = audio
+
+        audio.onended = () => {
+          isSpeaking.value = false
+          onlineAudio = null
+          resolve()
+        }
+
+        audio.onerror = () => {
+          isSpeaking.value = false
+          onlineAudio = null
+          reject(new Error('Audio playback failed'))
+        }
+
+        audio.oncanplaythrough = () => {
+          isSpeaking.value = true
+          audio.play().catch(reject)
+        }
+
+        audio.load()
+      })
+    } catch (err) {
+      isLoading.value = false
+      isSpeaking.value = false
+      engineError.value = `在线语音(${roleInfo.label})不可用，已切换浏览器语音`
+      cleanupOnline()
+      await speakWithBrowser(text, options)
+    }
+  }
+
+  async function speakWithEdgeTts(text: string, _options?: { lang?: string; rate?: number; pitch?: number }): Promise<void> {
+    if (!text || typeof window === 'undefined') return
+
+    cleanupOnline()
+    speechSynthesis.cancel()
+    engineError.value = ''
+
+    let voiceSettings: ReturnType<typeof useVoiceSettingsStore> | null = null
+    try {
+      voiceSettings = useVoiceSettingsStore()
+    } catch {
+      // store may not be available
+    }
+
+    const voice = voiceSettings?.edgeTtsVoice ?? 'zh-CN-XiaoxiaoNeural'
+    const rateVal = voiceSettings?.edgeTtsRate ?? 0
+    const pitchVal = voiceSettings?.edgeTtsPitch ?? 0
+    const volumeVal = voiceSettings?.edgeTtsVolume ?? 0
+
+    const truncatedText = text.length > 500 ? text.slice(0, 500) : text
+
+    isLoading.value = true
+
+    try {
+      const body: Record<string, string | number | null> = {
+        text: truncatedText,
+        voice,
+      }
+      if (rateVal !== 0) {
+        body.rate = rateVal > 0 ? `+${rateVal}` : `${rateVal}`
+      }
+      if (pitchVal !== 0) {
+        body.pitch = pitchVal > 0 ? `+${pitchVal}` : `${pitchVal}`
+      }
+      if (volumeVal !== 0) {
+        body.volume = volumeVal > 0 ? `+${volumeVal}` : `${volumeVal}`
+      }
+
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
+        throw new Error(errData.error || `HTTP ${response.status}`)
+      }
+
+      const blob = await response.blob()
+
+      if (blob.size === 0) {
+        throw new Error('No audio received')
+      }
+
+      const objectUrl = URL.createObjectURL(blob)
+      onlineObjectUrl = objectUrl
+
+      isLoading.value = false
+
+      await new Promise<void>((resolve, reject) => {
+        const audio = new Audio(objectUrl)
+        onlineAudio = audio
+
+        audio.onended = () => {
+          isSpeaking.value = false
+          onlineAudio = null
+          resolve()
+        }
+
+        audio.onerror = () => {
+          isSpeaking.value = false
+          onlineAudio = null
+          reject(new Error('Audio playback failed'))
+        }
+
+        audio.oncanplaythrough = () => {
+          isSpeaking.value = true
+          audio.play().catch(reject)
+        }
+
+        audio.load()
+      })
+    } catch (err) {
+      isLoading.value = false
+      isSpeaking.value = false
+      engineError.value = 'Edge-TTS语音不可用，已切换浏览器语音'
+      cleanupOnline()
+      await speakWithBrowser(text, _options)
+    }
   }
 
   async function speak(text: string, options?: { lang?: string; rate?: number; pitch?: number }) {
@@ -254,8 +383,10 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
 
     const engine = voiceSettings?.engine ?? 'browser'
 
-    if (engine === 'baidu') {
-      return speakWithBaidu(text, options)
+    if (engine === 'edge-tts') {
+      return speakWithEdgeTts(text, options)
+    } else if (engine === 'online') {
+      return speakWithOnline(text, options)
     } else {
       return speakWithBrowser(text, options)
     }
@@ -266,8 +397,9 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
     if (speechSynthesis.paused) {
       speechSynthesis.resume()
     }
-    stopBaiduAudio()
+    cleanupOnline()
     isSpeaking.value = false
+    isLoading.value = false
     currentUtterance.value = null
   }
 
@@ -277,6 +409,8 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
 
   return {
     isSpeaking,
+    isLoading,
+    engineError,
     speak,
     stop,
   }

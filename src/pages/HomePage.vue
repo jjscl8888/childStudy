@@ -63,6 +63,14 @@ const modules = [
     route: '/explore',
     moduleKey: 'explore',
   },
+  {
+    emoji: '🎙️',
+    title: '发音评测',
+    desc: '朗读评分练发音',
+    color: '#FF6348',
+    route: '/speech',
+    moduleKey: 'speech',
+  },
 ]
 
 const greeting = computed(() => {

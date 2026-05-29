@@ -102,6 +102,26 @@ function migrateVoiceSettings(database: Database) {
     if (!columns.includes('role')) {
       database.run("ALTER TABLE voice_settings ADD COLUMN role TEXT NOT NULL DEFAULT 'adult_female'")
     }
+    if (!columns.includes('edge_tts_voice')) {
+      database.run("ALTER TABLE voice_settings ADD COLUMN edge_tts_voice TEXT NOT NULL DEFAULT 'zh-CN-XiaoxiaoNeural'")
+    }
+    if (!columns.includes('edge_tts_rate')) {
+      database.run("ALTER TABLE voice_settings ADD COLUMN edge_tts_rate INTEGER NOT NULL DEFAULT 0")
+    }
+    if (!columns.includes('edge_tts_pitch')) {
+      database.run("ALTER TABLE voice_settings ADD COLUMN edge_tts_pitch INTEGER NOT NULL DEFAULT 0")
+    }
+    if (!columns.includes('edge_tts_volume')) {
+      database.run("ALTER TABLE voice_settings ADD COLUMN edge_tts_volume INTEGER NOT NULL DEFAULT 0")
+    }
+    if (!columns.includes('edge_tts_locale_filter')) {
+      database.run("ALTER TABLE voice_settings ADD COLUMN edge_tts_locale_filter TEXT NOT NULL DEFAULT 'zh-CN'")
+    }
+    if (!columns.includes('edge_tts_gender_filter')) {
+      database.run("ALTER TABLE voice_settings ADD COLUMN edge_tts_gender_filter TEXT NOT NULL DEFAULT 'Female'")
+    }
+
+    database.run("UPDATE voice_settings SET engine = 'online' WHERE engine = 'baidu'")
   } catch {
     // table may not exist yet
   }
