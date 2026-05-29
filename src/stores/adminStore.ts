@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { queryOne, run } from '@/db/database'
+import bcrypt from 'bcryptjs'
 
 export interface AdminUser {
   id: number
@@ -54,13 +55,20 @@ export const useAdminStore = defineStore('admin', () => {
   }
 
   function login(username: string, password: string): { success: boolean; error?: string } {
-    const hash = simpleHash(password)
     const row = queryOne<AdminRow>(
-      'SELECT * FROM admin_users WHERE username = ? AND password_hash = ?',
-      [username, hash]
+      'SELECT * FROM admin_users WHERE username = ?',
+      [username]
     )
     if (!row) {
       return { success: false, error: '用户名或密码错误' }
+    }
+    const bcryptMatch = bcrypt.compareSync(password, row.password_hash)
+    const simpleHashMatch = !bcryptMatch && simpleHash(password) === row.password_hash
+    if (!bcryptMatch && !simpleHashMatch) {
+      return { success: false, error: '用户名或密码错误' }
+    }
+    if (simpleHashMatch) {
+      run('UPDATE admin_users SET password_hash = ? WHERE id = ?', [bcrypt.hashSync(password, 10), row.id])
     }
     currentAdmin.value = {
       id: row.id,
@@ -80,15 +88,19 @@ export const useAdminStore = defineStore('admin', () => {
     if (!currentAdmin.value) {
       return { success: false, error: '请先登录' }
     }
-    const oldHash = simpleHash(oldPassword)
     const row = queryOne<AdminRow>(
-      'SELECT * FROM admin_users WHERE id = ? AND password_hash = ?',
-      [currentAdmin.value.id, oldHash]
+      'SELECT * FROM admin_users WHERE id = ?',
+      [currentAdmin.value.id]
     )
     if (!row) {
+      return { success: false, error: '用户不存在' }
+    }
+    const bcryptMatch = bcrypt.compareSync(oldPassword, row.password_hash)
+    const simpleHashMatch = !bcryptMatch && simpleHash(oldPassword) === row.password_hash
+    if (!bcryptMatch && !simpleHashMatch) {
       return { success: false, error: '原密码错误' }
     }
-    const newHash = simpleHash(newPassword)
+    const newHash = bcrypt.hashSync(newPassword, 10)
     run('UPDATE admin_users SET password_hash = ? WHERE id = ?', [newHash, currentAdmin.value.id])
     return { success: true }
   }

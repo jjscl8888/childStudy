@@ -6,7 +6,7 @@ import { chineseData } from '@/data/chineseData'
 import { useUserStore } from '@/stores/userStore'
 import { useLearningPathStore } from '@/stores/learningPathStore'
 import { useSpacedRepetitionStore } from '@/stores/spacedRepetitionStore'
-import { useTextToSpeech } from '@/composables/useTextToSpeech'
+import { useSpeechQueue } from '@/composables/useSpeechQueue'
 import SessionProgress from '@/components/learning/SessionProgress.vue'
 import HanziStrokeWriter from '@/components/learning/HanziStrokeWriter.vue'
 import CompanionGuide from '@/components/learning/CompanionGuide.vue'
@@ -18,7 +18,7 @@ const router = useRouter()
 const userStore = useUserStore()
 const learningPathStore = useLearningPathStore()
 const spacedRepetition = useSpacedRepetitionStore()
-const tts = useTextToSpeech('zh-CN', 0.6)
+const speech = useSpeechQueue('zh-CN', 0.6)
 
 const id = computed(() => route.params.id as string)
 const character = computed(() => chineseData.find(c => c.id === id.value))
@@ -78,11 +78,11 @@ function setCompanion(msg: string, emotion: 'happy' | 'encourage' | 'think' | 'c
 
 function playSound() {
   if (!character.value) return
-  tts.speak(character.value.character, { lang: 'zh-CN', rate: 0.6 })
+  speech.speakNow(character.value.character, { lang: 'zh-CN', rate: 0.6 })
 }
 
 function speakText(text: string, rate: number = 0.7) {
-  tts.speak(text, { lang: 'zh-CN', rate })
+  speech.speakNow(text, { lang: 'zh-CN', rate })
 }
 
 function onWritingComplete(accuracy: number) {
@@ -92,8 +92,10 @@ function onWritingComplete(accuracy: number) {
   stepResults.value.push({ step: 2, score: accuracy, stars })
   if (accuracy >= 80) {
     setCompanion('字写得真漂亮！像小书法家一样！✨', 'celebrate')
+    speech.speak('字写得真漂亮！像小书法家一样！')
   } else {
     setCompanion('写得不错！多练几次会更好哦！', 'encourage')
+    speech.speak('写得不错！多练几次会更好哦！')
   }
 }
 
@@ -103,10 +105,13 @@ function onMiniGameComplete(gameScore: number, stars: number) {
   stepResults.value.push({ step: 4, score: gameScore, stars })
   if (gameScore >= 80) {
     setCompanion('游戏高手！你真的记住这个字了！🎮✨', 'celebrate')
+    speech.speak('游戏高手！你真的记住这个字了！')
   } else if (gameScore >= 50) {
     setCompanion('小游戏玩得不错！印象更深了吧！', 'happy')
+    speech.speak('小游戏玩得不错！印象更深了吧！')
   } else {
     setCompanion('继续加油！多玩几次会更熟练的！', 'encourage')
+    speech.speak('继续加油！多玩几次会更熟练的！')
   }
 }
 
@@ -119,9 +124,11 @@ function selectOption(option: string) {
     correctAnswers.value++
     stepResults.value.push({ step: 5, score: 100, stars: 3 })
     setCompanion('答对了！你已经认识这个字了！🎉', 'celebrate')
+    speech.speak('答对了！你已经认识这个字了！')
   } else {
     stepResults.value.push({ step: 5, score: 0, stars: 1 })
     setCompanion(`正确答案是"${character.value?.character}"，记住啦！`, 'encourage')
+    speech.speak(`正确答案是"${character.value?.character}"，记住啦！`)
   }
 }
 
@@ -134,9 +141,11 @@ function selectWordOption(option: string) {
     correctAnswers.value++
     stepResults.value.push({ step: 3, score: 100, stars: 3 })
     setCompanion('太棒了！组词也难不倒你！', 'celebrate')
+    speech.speak('太棒了！组词也难不倒你！')
   } else {
     stepResults.value.push({ step: 3, score: 0, stars: 1 })
     setCompanion('没关系，看看正确答案吧！', 'encourage')
+    speech.speak('没关系，看看正确答案吧！')
   }
 }
 
@@ -152,32 +161,26 @@ function getRandomPraise(): string {
   return praiseMessages[Math.floor(Math.random() * praiseMessages.length)]
 }
 
-function speakIntro(text: string) {
-  setTimeout(() => {
-    tts.speak(text, { lang: 'zh-CN', rate: 0.7 })
-  }, 600)
-}
-
 function speakStepIntro(step: number) {
   if (!character.value) return
   switch (step) {
     case 0:
-      speakIntro(`来认识汉字${character.value.character}。它的拼音是${character.value.pinyin}。点击听一听发音按钮。`)
+      speech.speak(`来认识汉字${character.value.character}。它的拼音是${character.value.pinyin}。`)
       break
     case 1:
-      speakIntro(`每个汉字都有自己的故事。来听听${character.value.character}字是怎么来的。`)
+      speech.speak(`每个汉字都有自己的故事。来听听${character.value.character}字是怎么来的。`)
       break
     case 2:
-      speakIntro(`现在来写一写${character.value.character}字。在格子里认真写三次哦。`)
+      speech.speak(`现在来写一写${character.value.character}字。先看演示，再跟着写三次哦。`)
       break
     case 3:
-      speakIntro(`来学学${character.value.character}字怎么组词造句吧。`)
+      speech.speak(`来学学${character.value.character}字怎么组词造句吧。`)
       break
     case 4:
-      speakIntro(`来玩个小游戏吧！加深对${character.value.character}字的印象。`)
+      speech.speak(`来玩个小游戏吧！加深对${character.value.character}字的印象。`)
       break
     case 5:
-      speakIntro(`最后一关！看看你是不是真的学会了${character.value.character}字。`)
+      speech.speak(`最后一关！看看你是不是真的学会了${character.value.character}字。`)
       break
   }
 }
@@ -202,6 +205,7 @@ function nextStep() {
       setCompanion('最后一关！看看你是不是真的学会了！🏆', 'encourage')
     }
 
+    speech.clear()
     speakStepIntro(currentStep.value)
   } else {
     finishSession()
@@ -234,15 +238,13 @@ function finishSession() {
 
   setCompanion('太棒了！你又学会了一个新字！🌟', 'celebrate')
 
-  setTimeout(() => {
-    if (avgScore >= 80) {
-      tts.speak(`完美！汉字${character.value?.character}你已经完全掌握了！${getRandomPraise()}`, { lang: 'zh-CN', rate: 0.8 })
-    } else if (avgScore >= 50) {
-      tts.speak(`不错哦！汉字${character.value?.character}学习完成！继续努力！`, { lang: 'zh-CN', rate: 0.8 })
-    } else {
-      tts.speak(`汉字${character.value?.character}学习完成！多练习几次会更好的，加油！`, { lang: 'zh-CN', rate: 0.8 })
-    }
-  }, 800)
+  if (avgScore >= 80) {
+    speech.speak(`完美！汉字${character.value?.character}你已经完全掌握了！${getRandomPraise()}`)
+  } else if (avgScore >= 50) {
+    speech.speak(`不错哦！汉字${character.value?.character}学习完成！继续努力！`)
+  } else {
+    speech.speak(`汉字${character.value?.character}学习完成！多练习几次会更好的，加油！`)
+  }
 }
 
 function goBack() {
@@ -295,6 +297,7 @@ watch(id, (newId) => {
   resetSession()
   learningPathStore.startSession('chinese', newId, TOTAL_STEPS)
   setCompanion(`来认识汉字"${newItem.character}"吧！先看看它的样子~`, 'happy')
+  speech.clear()
   speakStepIntro(0)
 })
 
@@ -305,11 +308,12 @@ onMounted(() => {
   }
   learningPathStore.startSession('chinese', id.value, TOTAL_STEPS)
   setCompanion(`来认识汉字"${character.value.character}"吧！先看看它的样子~`, 'happy')
+  speech.clear()
   speakStepIntro(0)
 })
 
 onUnmounted(() => {
-  tts.stop()
+  speech.stop()
 })
 </script>
 

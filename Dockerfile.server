@@ -1,0 +1,11 @@
+FROM node:20-alpine
+RUN apk add --no-cache python3 py3-pip ffmpeg
+WORKDIR /app
+COPY package*.json ./
+RUN npm install --legacy-peer-deps || npm install --force
+COPY server.js .
+COPY scripts/ ./scripts/
+RUN pip3 install --no-cache-dir faster-whisper pypinyin --break-system-packages
+RUN mkdir -p uploads
+EXPOSE 3000
+CMD ["node", "server.js"]

@@ -66,7 +66,7 @@ function goToParent() {
 
 function handleLogout() {
   userStore.logout()
-  router.replace('/welcome')
+  router.replace('/login')
 }
 </script>
 

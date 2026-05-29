@@ -159,7 +159,8 @@ export const useVoiceSettingsStore = defineStore('voiceSettings', () => {
     edgeTtsVoicesError.value = ''
 
     try {
-      const response = await fetch('/api/voices')
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      const response = await fetch(`${apiBase}/api/voices`)
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }

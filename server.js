@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { webcrypto } from 'crypto';
 if (!globalThis.crypto) {
   globalThis.crypto = webcrypto;
@@ -6,6 +7,8 @@ if (!globalThis.crypto) {
 import express from 'express';
 import multer from 'multer';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
@@ -13,15 +16,52 @@ import { spawn } from 'child_process';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 import https from 'https';
 import { fileURLToPath } from 'url';
+import pino from 'pino';
+import authRoutes from './server/routes/auth.js';
+import syncRoutes from './server/routes/sync.js';
+import { optionalAuth } from './server/middleware/auth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const app = express();
-const PORT = 3000;
+const logger = pino({
+  level: process.env.LOG_LEVEL || 'info',
+  transport: process.env.NODE_ENV !== 'production' ? {
+    target: 'pino-pretty',
+    options: { colorize: true }
+  } : undefined,
+});
 
-app.use(cors());
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173').split(',').map(s => s.trim()).filter(Boolean);
+
+app.use(cors({
+  origin: corsOrigins,
+}));
+app.use(helmet());
+const rateLimiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW || '60000'),
+  max: parseInt(process.env.RATE_LIMIT_MAX || '60'),
+  message: { error: '请求过于频繁，请稍后再试' },
+});
+app.use('/api', rateLimiter);
 app.use(express.json());
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    logger.info({
+      method: req.method,
+      path: req.path,
+      status: res.statusCode,
+      duration,
+      ip: req.ip,
+    });
+  });
+  next();
+});
 
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -32,7 +72,23 @@ const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => cb(null, `${uuidv4()}.wav`),
 });
-const upload = multer({ storage });
+const ALLOWED_AUDIO_TYPES = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/webm', 'audio/ogg', 'audio/x-wav'];
+const ALLOWED_EXTENSIONS = ['.wav', '.mp3', '.webm', '.ogg'];
+
+const fileFilter = (req, file, cb) => {
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ALLOWED_EXTENSIONS.includes(ext) || ALLOWED_AUDIO_TYPES.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('仅支持音频文件格式（wav/mp3/webm/ogg）'));
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: parseInt(process.env.UPLOAD_MAX_SIZE || '10485760') },
+});
 
 function getPythonCommand() {
   return process.platform === 'win32' ? 'python' : 'python3';
@@ -76,13 +132,53 @@ function runAssessment(audioPath, expectedText, language) {
   });
 }
 
+app.use('/api/auth', authRoutes);
+app.use('/api/sync', syncRoutes);
+
+app.get('/api/health', async (req, res) => {
+  const health = {
+    status: 'ok',
+    version: '1.0.0',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    services: {
+      api: 'ok',
+      tts: 'unknown',
+      assessment: 'unknown',
+    },
+  };
+
+  try {
+    const tts = new MsEdgeTTS();
+    await tts.getVoices();
+    health.services.tts = 'ok';
+  } catch {
+    health.services.tts = 'degraded';
+  }
+
+  try {
+    const pythonCmd = process.platform === 'win32' ? 'python' : 'python3';
+    const check = spawn(pythonCmd, ['--version']);
+    await new Promise((resolve, reject) => {
+      check.on('close', (code) => code === 0 ? resolve() : reject());
+      check.on('error', reject);
+    });
+    health.services.assessment = 'ok';
+  } catch {
+    health.services.assessment = 'unavailable';
+  }
+
+  const hasDegraded = Object.values(health.services).some(s => s !== 'ok');
+  res.status(hasDegraded ? 200 : 200).json(health);
+});
+
 app.get('/api/voices', async (req, res) => {
   try {
     const tts = new MsEdgeTTS();
     const voices = await tts.getVoices();
     res.json(voices);
   } catch (error) {
-    console.error('msedge-tts getVoices failed, trying direct fetch:', error.message);
+    logger.error({ err: error }, 'msedge-tts getVoices failed, trying direct fetch:');
     try {
       const url = 'https://speech.platform.bing.com/consumer/speech/synthesize/readaloud/voices/list?trustedclienttoken=6A5AA1D4EAFF4E9FB37E23D68491D6F4';
       https.get(url, (apiRes) => {
@@ -97,7 +193,7 @@ app.get('/api/voices', async (req, res) => {
           }
         });
       }).on('error', (e) => {
-        console.error('Direct fetch voices failed:', e.message);
+        logger.error({ err: e }, 'Direct fetch voices failed:');
         res.status(500).json({ error: '获取音色列表失败' });
       });
     } catch (e2) {
@@ -106,7 +202,7 @@ app.get('/api/voices', async (req, res) => {
   }
 });
 
-app.post('/api/tts', async (req, res) => {
+app.post('/api/tts', optionalAuth, async (req, res) => {
   try {
     const { text, voice, rate, pitch, volume } = req.body;
     if (!text || !text.trim()) {
@@ -139,18 +235,18 @@ app.post('/api/tts', async (req, res) => {
     });
 
     audioStream.on('error', (err) => {
-      console.error('TTS流错误:', err);
+      logger.error({ err }, 'TTS流错误:');
       if (!res.headersSent) {
         res.status(500).json({ error: '语音合成失败' });
       }
     });
   } catch (error) {
-    console.error('TTS合成错误:', error);
+    logger.error({ err: error }, 'TTS合成错误:');
     res.status(500).json({ error: '语音合成失败: ' + error.message });
   }
 });
 
-app.post('/api/assess', upload.single('audio'), async (req, res) => {
+app.post('/api/assess', optionalAuth, upload.single('audio'), async (req, res) => {
   try {
     const { expectedText, language } = req.body;
     const audioPath = req.file?.path;
@@ -167,7 +263,7 @@ app.post('/api/assess', upload.single('audio'), async (req, res) => {
       ...result,
     });
   } catch (error) {
-    console.error('评测错误:', error);
+    logger.error({ err: error }, '评测错误:');
     res.status(500).json({ error: '评测失败: ' + error.message });
   }
 });
@@ -182,6 +278,24 @@ app.delete('/api/audio/:filename', (req, res) => {
 
 app.use('/uploads', express.static(uploadsDir));
 
+function cleanOldUploads() {
+  try {
+    const files = fs.readdirSync(uploadsDir);
+    const now = Date.now();
+    const ONE_HOUR = 60 * 60 * 1000;
+    for (const file of files) {
+      const filepath = path.join(uploadsDir, file);
+      const stat = fs.statSync(filepath);
+      if (now - stat.mtimeMs > ONE_HOUR) {
+        fs.unlinkSync(filepath);
+      }
+    }
+  } catch {}
+}
+
+cleanOldUploads();
+setInterval(cleanOldUploads, 10 * 60 * 1000);
+
 app.listen(PORT, () => {
-  console.log(`✅ TTS服务已启动: http://localhost:${PORT}`);
+  logger.info(`TTS服务已启动: http://localhost:${PORT}`);
 });

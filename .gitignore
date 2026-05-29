@@ -77,3 +77,5 @@ project/llm_proxy/
 
 # Server uploads
 uploads/
+
+.env

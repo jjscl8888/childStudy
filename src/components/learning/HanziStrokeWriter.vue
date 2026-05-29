@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import HanziWriter from 'hanzi-writer'
-import { useTextToSpeech } from '@/composables/useTextToSpeech'
+import { useSpeechQueue } from '@/composables/useSpeechQueue'
 
 const props = defineProps<{
   character: string
@@ -42,7 +42,7 @@ const strokeNames = ref<string[]>([])
 
 let writer: HanziWriter | null = null
 
-const { speak, stop: stopSpeaking } = useTextToSpeech('zh-CN', 0.8)
+const speech = useSpeechQueue('zh-CN', 0.8)
 
 function classifySegmentDirection(dx: number, dy: number, isCompoundFirst: boolean = false): string {
   const length = Math.sqrt(dx * dx + dy * dy)
@@ -220,7 +220,7 @@ function setHint(text: string) {
 
 function speakHint(text: string) {
   setHint(text)
-  speak(text)
+  speech.speak(text)
 }
 
 function getPhaseLabel() {
@@ -269,7 +269,7 @@ function createWriter(quizMode: boolean = false) {
       }
       writerReady.value = true
       if (quizMode) {
-        speakHint(`请沿着浅色笔画描摹！第1笔是${getStrokeName(0)}！`)
+        speech.speak(`请沿着浅色笔画描摹！第1笔是${getStrokeName(0)}！`)
       }
     },
     onLoadCharDataError: function () {
@@ -281,16 +281,22 @@ function createWriter(quizMode: boolean = false) {
 
 function playDemo() {
   if (!writer || !writerReady.value) return
-  stopSpeaking()
+  speech.stop()
   isAnimating.value = true
   currentStrokeNum.value = 0
   writer.hideCharacter()
+
+  speech.speakNow(`"${props.character}"字，一共${totalStrokes.value}笔，请仔细看每一笔的顺序！`)
+
+  let strokeIndex = 0
+  const originalOnComplete = () => {
+    isAnimating.value = false
+    demoPlayed.value = true
+    speech.speak(`演示结束，你看清楚了吗？点击"开始练习"来试一试吧！`)
+  }
+
   writer.animateCharacter({
-    onComplete: function () {
-      isAnimating.value = false
-      demoPlayed.value = true
-      speak(`"${props.character}"字，一共${totalStrokes.value}笔，你看清楚了吗？`)
-    },
+    onComplete: originalOnComplete,
   })
 }
 
@@ -332,13 +338,12 @@ function doStartQuiz() {
       currentStrokeNum.value = strokeData.strokeNum + 1
 
       if (strokeData.strokeNum === totalStrokes.value - 1) {
-        speakHint('太棒了！这个字写完啦！')
-        stopSpeaking()
-        setTimeout(() => speak(`${props.character}，写得真漂亮！`), 600)
+        speech.speak('太棒了！这个字写完啦！')
+        speech.speak(`${props.character}，写得真漂亮！`)
       } else {
         const nextIdx = strokeData.strokeNum + 1
         const name = getStrokeName(nextIdx)
-        speakHint(`第${strokeData.strokeNum + 1}笔写得好！接着写第${nextIdx + 1}笔，${name}！`)
+        speech.speak(`第${strokeData.strokeNum + 1}笔写得好！接着写第${nextIdx + 1}笔，${name}！`)
       }
     },
     onComplete: function (summaryData: any) {
@@ -366,7 +371,7 @@ function doStartQuiz() {
 }
 
 function goBackToDemo() {
-  stopSpeaking()
+  speech.stop()
   phase.value = 'demo'
   isQuizzing.value = false
   writer?.cancelQuiz?.()
@@ -376,7 +381,7 @@ function goBackToDemo() {
 }
 
 function resetAll() {
-  stopSpeaking()
+  speech.stop()
   currentAttempt.value = 1
   attemptResults.value = []
   allCompleted.value = false
@@ -402,7 +407,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   writer = null
-  stopSpeaking()
+  speech.stop()
 })
 </script>
 

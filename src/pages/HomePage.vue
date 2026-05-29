@@ -14,7 +14,7 @@ const learningPathStore = useLearningPathStore()
 const spacedRepetition = useSpacedRepetitionStore()
 
 if (!userStore.currentUser) {
-  router.replace('/welcome')
+  router.replace('/login')
 }
 
 onMounted(() => {

@@ -78,7 +78,7 @@ function handleLogin() {
         <div class="mt-4 pt-4 border-t border-gray-100">
           <button
             class="w-full text-sm text-gray-400 hover:text-gray-600 transition-colors py-2"
-            @click="router.push('/welcome')"
+            @click="router.push('/login')"
           >
             ← 返回用户选择
           </button>

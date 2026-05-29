@@ -1,5 +1,6 @@
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js'
 import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url'
+import bcrypt from 'bcryptjs'
 
 const DB_NAME = 'funlearn_db'
 const DB_STORE = 'sqlite_db'
@@ -276,12 +277,7 @@ function createTables(database: Database) {
   if (!adminExists) {
     database.run(
       "INSERT INTO admin_users (username, password_hash, created_at) VALUES (?, ?, ?)",
-      ['admin', '001ed085a638860c', new Date().toISOString()]
-    )
-  } else {
-    database.run(
-      "UPDATE admin_users SET password_hash = ? WHERE password_hash = ?",
-      ['001ed085a638860c', '000fae2419705676']
+      ['admin', bcrypt.hashSync('123456', 10), new Date().toISOString()]
     )
   }
 

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { query, queryOne, run, getDatabase, schedulePersist } from '@/db/database'
+import { uploadToCloud } from '@/db/sync'
 
 export interface UserProfile {
   id: string
@@ -255,6 +256,7 @@ export const useUserStore = defineStore('user', () => {
       addStars(record.starsEarned)
     }
     checkAchievements()
+    uploadToCloud().catch(() => {})
   }
 
   function startSession() {

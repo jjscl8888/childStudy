@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { chineseData } from '@/data/chineseData'
 import type { ChineseCharacter } from '@/data/chineseData'
+import { useSpeechQueue } from '@/composables/useSpeechQueue'
 
 const props = defineProps<{
   character: ChineseCharacter
@@ -60,6 +61,8 @@ const speedShowChar = ref(false)
 const speedFeedback = ref<'hit' | 'miss' | 'false' | null>(null)
 let speedTimer: ReturnType<typeof setTimeout> | null = null
 
+const speech = useSpeechQueue('zh-CN', 0.8)
+
 const distractors = computed(() => {
   return chineseData
     .filter(c => c.id !== props.character.id)
@@ -78,6 +81,7 @@ function shuffle<T>(arr: T[]): T[] {
 function startGame() {
   phase.value = 'bubble'
   score.value = 0
+  speech.speakNow(`游戏开始！第一关，泡泡消消乐。找到并点击"${props.character.character}"字的泡泡！`)
   startBubbleRound()
 }
 
@@ -129,6 +133,7 @@ function tapBubble(bubble: Bubble) {
     bubble.state = 'popping'
     bubbleHits.value++
     score.value += 10
+    speech.speak('点对了！')
     setTimeout(() => {
       bubble.state = 'gone'
     }, 400)
@@ -137,9 +142,11 @@ function tapBubble(bubble: Bubble) {
         bubbleRound.value++
         if (bubbleAnimFrame) cancelAnimationFrame(bubbleAnimFrame)
         if (bubbleRound.value >= totalBubbleRounds) {
+          speech.speak('泡泡消消乐完成！接下来是拼音配对。')
           phase.value = 'match'
           startMatchRound()
         } else {
+          speech.speak(`第${bubbleRound.value + 1}轮，继续找"${props.character.character}"字！`)
           startBubbleRound()
         }
       }, 600)
@@ -148,6 +155,7 @@ function tapBubble(bubble: Bubble) {
     bubble.state = 'wrong'
     bubbleMisses.value++
     score.value = Math.max(0, score.value - 3)
+    speech.speak('不对哦，再找找！')
     setTimeout(() => {
       bubble.state = 'idle'
     }, 500)
@@ -163,6 +171,7 @@ function startMatchRound() {
     ...others.map(c => ({ pinyin: c.pinyin, isCorrect: false })),
   ])
   matchOptions.value = options
+  speech.speak(`"${props.character.character}"字的拼音是什么？请选择正确的拼音！`)
 }
 
 function selectMatch(option: { pinyin: string; isCorrect: boolean }) {
@@ -172,10 +181,14 @@ function selectMatch(option: { pinyin: string; isCorrect: boolean }) {
   if (option.isCorrect) {
     matchCorrect.value++
     score.value += 15
+    speech.speak('答对了！')
+  } else {
+    speech.speak(`不对哦，"${props.character.character}"字的拼音是${props.character.pinyin}。`)
   }
   setTimeout(() => {
     matchRound.value++
     if (matchRound.value >= totalMatchRounds) {
+      speech.speak('拼音配对完成！接下来是快速点击。')
       phase.value = 'speed'
       startSpeedRound()
     } else {
@@ -203,6 +216,7 @@ function startSpeedRound() {
     rounds.push({ char: ch, isTarget: false })
   }
   speedRounds.value = shuffle(rounds)
+  speech.speak(`快速点击！看到"${props.character.character}"字就快快点击！`)
   showNextSpeedChar()
 }
 
@@ -232,10 +246,12 @@ function tapSpeedChar() {
     speedHits.value++
     score.value += 8
     speedFeedback.value = 'hit'
+    speech.speak('点到了！')
   } else {
     speedFalseAlarms.value++
     score.value = Math.max(0, score.value - 5)
     speedFeedback.value = 'false'
+    speech.speak('这不是目标字哦！')
   }
 
   if (speedTimer) clearTimeout(speedTimer)
@@ -248,6 +264,13 @@ function finishSpeedRound() {
   phase.value = 'done'
   const finalScore = Math.min(score.value, maxScore.value)
   const stars = finalScore >= 80 ? 3 : finalScore >= 50 ? 2 : 1
+  if (stars >= 3) {
+    speech.speak('太厉害了！游戏完美通关！')
+  } else if (stars >= 2) {
+    speech.speak('不错哦！游戏完成！')
+  } else {
+    speech.speak('游戏完成！再练练会更好的！')
+  }
   emit('complete', finalScore, stars)
 }
 
@@ -268,6 +291,7 @@ watch(() => props.character.id, () => {
 onUnmounted(() => {
   if (bubbleAnimFrame) cancelAnimationFrame(bubbleAnimFrame)
   if (speedTimer) clearTimeout(speedTimer)
+  speech.stop()
 })
 </script>
 

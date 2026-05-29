@@ -317,7 +317,8 @@ export function useTextToSpeech(defaultLang: string = 'zh-CN', defaultRate: numb
         body.volume = volumeVal > 0 ? `+${volumeVal}` : `${volumeVal}`
       }
 
-      const response = await fetch('/api/tts', {
+      const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+      const response = await fetch(`${apiBase}/api/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

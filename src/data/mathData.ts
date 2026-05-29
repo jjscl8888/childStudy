@@ -31,6 +31,9 @@ export const mathLevels: MathLevel[] = [
   { id: 'ml10', name: '认识人民币', description: '认识元角分', icon: '💰', level: 10, color: '#FF9F43' },
   { id: 'ml11', name: '分类归类', description: '按特征分类物品', icon: '📦', level: 11, color: '#55E6C1' },
   { id: 'ml12', name: '数的组成', description: '20以内数的分解与组成', icon: '🧩', level: 12, color: '#778BEB' },
+  { id: 'ml13', name: '应用题入门', description: '简单的图文应用题', icon: '📖', level: 13, color: '#FF6B81' },
+  { id: 'ml14', name: '应用题进阶', description: '多步计算应用题', icon: '📚', level: 14, color: '#7BED9F' },
+  { id: 'ml15', name: '图形认知', description: '认识基本图形', icon: '🔷', level: 15, color: '#70A1FF' },
 ]
 
 function generateAddition(maxSum: number): MathProblem {
@@ -279,6 +282,200 @@ function generateSequence(): MathProblem {
   }
 }
 
+function generateWordProblem(): MathProblem {
+  const scenarios = [
+    {
+      template: (a: number, b: number) => `小明有${a}颗糖，妈妈又给了他${b}颗，现在一共有几颗糖？`,
+      operation: 'add',
+      maxA: 10,
+      maxB: 10,
+      visual: '🍬',
+    },
+    {
+      template: (a: number, b: number) => `树上有${a}只鸟，飞走了${b}只，还剩几只鸟？`,
+      operation: 'sub',
+      maxA: 15,
+      maxB: 10,
+      visual: '🐦',
+    },
+    {
+      template: (a: number, b: number) => `小红有${a}本书，小华有${b}本书，他们一共有几本书？`,
+      operation: 'add',
+      maxA: 8,
+      maxB: 7,
+      visual: '📚',
+    },
+    {
+      template: (a: number, b: number) => `篮子里有${a}个苹果，吃掉了${b}个，还剩几个苹果？`,
+      operation: 'sub',
+      maxA: 12,
+      maxB: 8,
+      visual: '🍎',
+    },
+    {
+      template: (a: number, b: number) => `教室里有${a}个男生，${b}个女生，一共有多少个学生？`,
+      operation: 'add',
+      maxA: 10,
+      maxB: 10,
+      visual: '👦👧',
+    },
+    {
+      template: (a: number, b: number) => `停车场里有${a}辆车，开走了${b}辆，还剩几辆车？`,
+      operation: 'sub',
+      maxA: 15,
+      maxB: 10,
+      visual: '🚗',
+    },
+    {
+      template: (a: number, b: number) => `花园里有${a}朵红花，${b}朵黄花，一共有多少朵花？`,
+      operation: 'add',
+      maxA: 8,
+      maxB: 8,
+      visual: '🌸',
+    },
+    {
+      template: (a: number, b: number) => `鱼缸里有${a}条鱼，捞出了${b}条，还剩几条鱼？`,
+      operation: 'sub',
+      maxA: 10,
+      maxB: 6,
+      visual: '🐟',
+    },
+  ]
+  const scenario = scenarios[Math.floor(Math.random() * scenarios.length)]
+  const a = Math.floor(Math.random() * scenario.maxA) + 1
+  const b = Math.floor(Math.random() * Math.min(scenario.maxB, a)) + 1
+  const answer = scenario.operation === 'add' ? a + b : a - b
+  return {
+    id: `wp-${Date.now()}-${Math.random()}`,
+    type: 'addition',
+    level: 13,
+    question: scenario.template(a, b),
+    answer,
+    options: generateOptions(answer, 4),
+    visualAid: scenario.visual.repeat(Math.min(answer, 10)),
+    hint: scenario.operation === 'add' ? `把${a}和${b}加起来` : `从${a}里减去${b}`,
+  }
+}
+
+function generateAdvancedWordProblem(): MathProblem {
+  const scenarios = [
+    {
+      template: (a: number, b: number, c: number) => `商店里有${a}个气球，上午卖出${b}个，下午又卖出${c}个，还剩几个气球？`,
+      answer: (a: number, b: number, c: number) => a - b - c,
+      maxA: 20,
+      maxB: 8,
+      maxC: 5,
+      visual: '🎈',
+      hint: '先减上午卖出的，再减下午卖出的',
+    },
+    {
+      template: (a: number, b: number, c: number) => `小明有${a}元钱，买了一支笔花了${b}元，又买了一块橡皮花了${c}元，还剩几元？`,
+      answer: (a: number, b: number, c: number) => a - b - c,
+      maxA: 20,
+      maxB: 5,
+      maxC: 3,
+      visual: '💰',
+      hint: '总钱数减去两次花的钱',
+    },
+    {
+      template: (a: number, b: number, c: number) => `草地上有${a}只白兔，${b}只灰兔，又来了${c}只黑兔，一共有几只兔？`,
+      answer: (a: number, b: number, c: number) => a + b + c,
+      maxA: 8,
+      maxB: 6,
+      maxC: 5,
+      visual: '🐰',
+      hint: '把三种颜色的兔子数量加起来',
+    },
+    {
+      template: (a: number, b: number, c: number) => `书架上层有${a}本书，中层有${b}本书，下层有${c}本书，书架上一共有几本书？`,
+      answer: (a: number, b: number, c: number) => a + b + c,
+      maxA: 8,
+      maxB: 7,
+      maxC: 6,
+      visual: '📚',
+      hint: '把三层书架的书加起来',
+    },
+    {
+      template: (a: number, b: number, c: number) => `公交车上有${a}个人，到站后下去了${b}个人，又上来了${c}个人，现在车上有几个人？`,
+      answer: (a: number, b: number, c: number) => a - b + c,
+      maxA: 15,
+      maxB: 6,
+      maxC: 5,
+      visual: '🚌',
+      hint: '先减去下车的人，再加上上车的人',
+    },
+  ]
+  const scenario = scenarios[Math.floor(Math.random() * scenarios.length)]
+  const a = Math.floor(Math.random() * scenario.maxA) + 5
+  const b = Math.floor(Math.random() * Math.min(scenario.maxB, a - 1)) + 1
+  const c = Math.floor(Math.random() * scenario.maxC) + 1
+  const answer = scenario.answer(a, b, c)
+  return {
+    id: `awp-${Date.now()}-${Math.random()}`,
+    type: 'addition',
+    level: 14,
+    question: scenario.template(a, b, c),
+    answer,
+    options: generateOptions(answer, 4),
+    visualAid: scenario.visual.repeat(Math.min(Math.max(a, answer), 10)),
+    hint: scenario.hint,
+  }
+}
+
+function generateShapeProblem(): MathProblem {
+  const shapes = [
+    { name: '正方形', emoji: '⬜', sides: 4, corners: 4 },
+    { name: '长方形', emoji: '▭', sides: 4, corners: 4 },
+    { name: '圆形', emoji: '⭕', sides: 0, corners: 0 },
+    { name: '三角形', emoji: '🔺', sides: 3, corners: 3 },
+    { name: '五角星', emoji: '⭐', points: 5 },
+  ]
+  const type = Math.floor(Math.random() * 3)
+  let question: string
+  let answer: number
+  let hint: string
+  let visualAid: string
+
+  if (type === 0) {
+    const shape = shapes[Math.floor(Math.random() * shapes.length)]
+    question = `这个图形是${shape.emoji}，它是什么形状？\n1. 正方形  2. 长方形  3. 圆形  4. 三角形  5. 五角星`
+    const shapeNames = ['正方形', '长方形', '圆形', '三角形', '五角星']
+    answer = shapeNames.indexOf(shape.name) + 1
+    visualAid = shape.emoji
+    hint = `观察${shape.emoji}的形状特征`
+  } else if (type === 1) {
+    const shape = shapes[Math.floor(Math.random() * 4)]
+    if (shape.name === '圆形') {
+      question = `圆形有${shape.corners}条边，对吗？\n1. 对  2. 不对`
+      answer = 1
+      hint = '圆形是圆圆的，没有边'
+    } else {
+      question = `${shape.name}有${shape.sides}条边和${shape.corners}个角，对吗？\n1. 对  2. 不对`
+      answer = 1
+      hint = `数一数${shape.name}的边和角`
+    }
+    visualAid = shape.emoji
+  } else {
+    const count = Math.floor(Math.random() * 5) + 3
+    const shape = shapes[Math.floor(Math.random() * shapes.length)]
+    question = `图中有几个${shape.name}？`
+    answer = count
+    visualAid = shape.emoji.repeat(count)
+    hint = `一个一个数${shape.name}`
+  }
+
+  return {
+    id: `shp-${Date.now()}-${Math.random()}`,
+    type: 'counting',
+    level: 15,
+    question,
+    answer,
+    options: type === 0 ? generateIndexOptions(5) : type === 1 ? generateIndexOptions(2) : generateOptions(answer, 4),
+    visualAid,
+    hint,
+  }
+}
+
 export function generateMathProblem(level: number): MathProblem {
   switch (level) {
     case 1: {
@@ -317,6 +514,12 @@ export function generateMathProblem(level: number): MathProblem {
       return generateClassification()
     case 12:
       return generateSequence()
+    case 13:
+      return generateWordProblem()
+    case 14:
+      return generateAdvancedWordProblem()
+    case 15:
+      return generateShapeProblem()
     default:
       return generateAddition(5)
   }
